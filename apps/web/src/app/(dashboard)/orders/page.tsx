@@ -1,3 +1,4 @@
+import { OrderTransitionButton } from "@/components/order-transition-button";
 import { getOrders, type Order, type OrderStatus } from "@/lib/api";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -23,6 +24,7 @@ function OrderCard({ order }: { order: Order }) {
           </li>
         ))}
       </ul>
+      <OrderTransitionButton orderId={order.id} status={order.status} />
     </article>
   );
 }
