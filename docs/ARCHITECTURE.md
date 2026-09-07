@@ -49,3 +49,10 @@ Arquitetura inicial: **modular monolith**.
 
 ## Why not microservices now
 O alvo possui muitos módulos, mas isso não implica que o Salva Food precise começar distribuído. Um modular monolith reduz custo de coordenação, simplifica transações e acelera a obtenção de paridade. Boundaries serão mantidos para extração futura apenas se throughput, isolamento ou ownership justificarem.
+
+## Web session boundary
+- `apps/web` usa Next.js App Router + TypeScript.
+- A autenticação de domínio continua pertencendo à API Go.
+- O BFF do Next existe apenas para transformar o token opaco em cookie `HttpOnly` e encaminhar chamadas server-side.
+- O token de sessão não deve ser persistido em `localStorage`/`sessionStorage`.
+- Páginas autenticadas derivam tenant e permissões da sessão; o browser não escolhe `tenant_id` em headers de negócio.
