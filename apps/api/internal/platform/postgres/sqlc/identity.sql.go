@@ -290,6 +290,41 @@ func (q *Queries) ListCollaborators(ctx context.Context, arg ListCollaboratorsPa
 	return items, nil
 }
 
+const listTenantMembershipsByUser = `-- name: ListTenantMembershipsByUser :many
+SELECT tenant_id, user_id, title, status, permissions, created_at, updated_at
+FROM tenant_memberships
+WHERE user_id = $1
+ORDER BY tenant_id
+`
+
+func (q *Queries) ListTenantMembershipsByUser(ctx context.Context, userID pgtype.UUID) ([]TenantMembership, error) {
+	rows, err := q.db.Query(ctx, listTenantMembershipsByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TenantMembership{}
+	for rows.Next() {
+		var i TenantMembership
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.UserID,
+			&i.Title,
+			&i.Status,
+			&i.Permissions,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeAuthSession = `-- name: RevokeAuthSession :one
 UPDATE auth_sessions
 SET revoked_at = now()

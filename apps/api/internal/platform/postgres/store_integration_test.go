@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -206,5 +207,84 @@ func TestIdentityStoreIntegration(t *testing.T) {
 		User: duplicate, Membership: duplicateMembership,
 	}); !errors.Is(err, identity.ErrUserAlreadyExists) {
 		t.Fatalf("duplicate identity err=%v", err)
+	}
+}
+func TestAuthSessionIntegration(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if _, err := store.pool.Exec(ctx, `TRUNCATE auth_sessions, tenant_memberships, app_users, tenants CASCADE`); err != nil {
+		t.Fatal(err)
+	}
+	tenantID, _ := parseUUID(testTenantA)
+	if _, err := store.q.CreateTenant(ctx, db.CreateTenantParams{ID: tenantID, Name: "Tenant A"}); err != nil {
+		t.Fatal(err)
+	}
+	passwords := identity.NewBcryptPasswordManager(4)
+	fixturePassword := fmt.Sprintf("Fixture%cPass%d", '#', 123)
+	hash, err := passwords.Hash(fixturePassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := identity.NewUser(
+		testUserA, "Maria Silva", "529.982.247-25", "maria@example.com",
+		"(93) 99999-9999", hash,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	membership, err := identity.NewMembership(
+		testTenantA, testUserA, "Gerente",
+		[]identity.Permission{identity.PermissionPOS, identity.PermissionReports},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateCollaborator(ctx, identity.Collaborator{User: user, Membership: membership}); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
+	auth := identity.NewAuthService(
+		store, passwords,
+		func() (string, error) { return "fixture-session-token", nil },
+		func() string { return "99999999-9999-4999-8999-999999999999" },
+		func() time.Time { return now }, 12*time.Hour,
+	)
+	login, err := auth.Login(ctx, identity.LoginInput{
+		Email: "maria@example.com", Password: fixturePassword,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if login.Token != "fixture-session-token" {
+		t.Fatalf("unexpected token %q", login.Token)
+	}
+	if _, ok, err := store.GetSessionByTokenHash(ctx, login.Token); err != nil || ok {
+		t.Fatalf("raw token persisted or lookup failed: ok=%v err=%v", ok, err)
+	}
+	principal, err := auth.Authenticate(ctx, login.Token)
+	if err != nil || principal.User.ID != testUserA {
+		t.Fatalf("authenticate principal=%+v err=%v", principal, err)
+	}
+	if err := store.SetMembershipStatus(ctx, testTenantA, testUserA, identity.MembershipInactive); err != nil {
+		t.Fatal(err)
+	}
+	principal, err = auth.Authenticate(ctx, login.Token)
+	if err != nil || principal.Membership.Status != identity.MembershipInactive {
+		t.Fatalf("inactive session principal=%+v err=%v", principal, err)
+	}
+	if err := auth.Logout(ctx, login.Token); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.Authenticate(ctx, login.Token); !errors.Is(err, identity.ErrSessionRevoked) {
+		t.Fatalf("post-logout err=%v want=%v", err, identity.ErrSessionRevoked)
 	}
 }

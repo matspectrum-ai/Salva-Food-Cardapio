@@ -6,21 +6,22 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
-
-	"github.com/google/uuid"
 
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/catalog"
+	"github.com/matspectrum-ai/salva-food/apps/api/internal/identity"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
 )
 
 type IDGenerator func() string
 
 type API struct {
-	catalog      catalog.Repository
-	orders       orders.Repository
-	orderService *orders.Service
-	newID        IDGenerator
+	catalog         catalog.Repository
+	orders          orders.Repository
+	orderService    *orders.Service
+	identityService *identity.Service
+	authService     *identity.AuthService
+	strictAuth      bool
+	newID           IDGenerator
 }
 
 type catalogReader struct {
@@ -52,11 +53,18 @@ func (r catalogReader) LookupOrderProduct(ctx context.Context, tenantID, itemID 
 }
 
 func New(catalogStore catalog.Repository, orderStore orders.Repository, newID IDGenerator) *API {
+	return newAPI(catalogStore, orderStore, nil, nil, false, newID)
+}
+
+func NewAuthenticated(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, newID IDGenerator) *API {
+	return newAPI(catalogStore, orderStore, identityService, authService, true, newID)
+}
+
+func newAPI(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, strictAuth bool, newID IDGenerator) *API {
 	return &API{
-		catalog:      catalogStore,
-		orders:       orderStore,
-		orderService: orders.NewService(orderStore, catalogReader{store: catalogStore}, orders.IDGenerator(newID)),
-		newID:        newID,
+		catalog: catalogStore, orders: orderStore,
+		orderService:    orders.NewService(orderStore, catalogReader{store: catalogStore}, orders.IDGenerator(newID)),
+		identityService: identityService, authService: authService, strictAuth: strictAuth, newID: newID,
 	}
 }
 func (a *API) Handler() http.Handler {
@@ -68,6 +76,9 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/orders", a.createOrder)
 	mux.HandleFunc("GET /api/v1/orders", a.listOrders)
 	mux.HandleFunc("POST /api/v1/orders/{id}/transitions", a.transitionOrder)
+	if a.authService != nil && a.identityService != nil {
+		a.registerIdentityRoutes(mux)
+	}
 	return mux
 }
 
@@ -77,7 +88,7 @@ type createCategoryRequest struct {
 }
 
 func (a *API) createCategory(w http.ResponseWriter, r *http.Request) {
-	tenantID, ok := tenantFromRequest(w, r)
+	tenantID, ok := a.tenantFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -98,7 +109,7 @@ func (a *API) createCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) listCategories(w http.ResponseWriter, r *http.Request) {
-	tenantID, ok := tenantFromRequest(w, r)
+	tenantID, ok := a.tenantFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -119,7 +130,7 @@ type createItemRequest struct {
 }
 
 func (a *API) createItem(w http.ResponseWriter, r *http.Request) {
-	tenantID, ok := tenantFromRequest(w, r)
+	tenantID, ok := a.tenantFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -150,7 +161,7 @@ func (a *API) createItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) listItems(w http.ResponseWriter, r *http.Request) {
-	tenantID, ok := tenantFromRequest(w, r)
+	tenantID, ok := a.tenantFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -162,7 +173,7 @@ func (a *API) listItems(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": items})
 }
 func (a *API) createOrder(w http.ResponseWriter, r *http.Request) {
-	tenantID, ok := tenantFromRequest(w, r)
+	tenantID, ok := a.tenantFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -189,7 +200,7 @@ func (a *API) createOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) listOrders(w http.ResponseWriter, r *http.Request) {
-	tenantID, ok := tenantFromRequest(w, r)
+	tenantID, ok := a.tenantFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -206,7 +217,7 @@ type transitionOrderRequest struct {
 }
 
 func (a *API) transitionOrder(w http.ResponseWriter, r *http.Request) {
-	tenantID, ok := tenantFromRequest(w, r)
+	tenantID, ok := a.tenantFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -224,19 +235,6 @@ func (a *API) transitionOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, order)
-}
-
-func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
-	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if tenantID == "" {
-		writeError(w, http.StatusBadRequest, errors.New("X-Tenant-ID header is required"))
-		return "", false
-	}
-	if _, err := uuid.Parse(tenantID); err != nil {
-		writeError(w, http.StatusBadRequest, errors.New("X-Tenant-ID must be a valid UUID"))
-		return "", false
-	}
-	return tenantID, true
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {

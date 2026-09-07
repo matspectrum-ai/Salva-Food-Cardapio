@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -27,17 +28,21 @@ type Repository interface {
 	SetMembershipStatus(context.Context, string, string, MembershipStatus) error
 }
 type MemoryStore struct {
-	mu          sync.RWMutex
-	users       map[string]User
-	userByEmail map[string]string
-	memberships map[string]map[string]Membership
+	mu               sync.RWMutex
+	users            map[string]User
+	userByEmail      map[string]string
+	memberships      map[string]map[string]Membership
+	sessionsByToken  map[string]Session
+	sessionTokenByID map[string]string
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		users:       make(map[string]User),
-		userByEmail: make(map[string]string),
-		memberships: make(map[string]map[string]Membership),
+		users:            make(map[string]User),
+		userByEmail:      make(map[string]string),
+		memberships:      make(map[string]map[string]Membership),
+		sessionsByToken:  make(map[string]Session),
+		sessionTokenByID: make(map[string]string),
 	}
 }
 
@@ -138,3 +143,80 @@ func cloneMembership(membership Membership) Membership {
 	clone.Permissions = append([]Permission(nil), membership.Permissions...)
 	return clone
 }
+
+func (s *MemoryStore) GetUserByID(_ context.Context, userID string) (User, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	user, ok := s.users[userID]
+	if !ok {
+		return User{}, false, nil
+	}
+	return cloneUser(user), true, nil
+}
+
+func (s *MemoryStore) ListMembershipsByUser(_ context.Context, userID string) ([]Membership, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]Membership, 0)
+	for _, tenantMemberships := range s.memberships {
+		if membership, ok := tenantMemberships[userID]; ok {
+			result = append(result, cloneMembership(membership))
+		}
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].TenantID < result[j].TenantID })
+	return result, nil
+}
+
+func (s *MemoryStore) CreateSession(_ context.Context, session Session) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.sessionTokenByID[session.ID]; exists {
+		return ErrSessionAlreadyExists
+	}
+	if _, exists := s.sessionsByToken[session.TokenHash]; exists {
+		return ErrSessionAlreadyExists
+	}
+	stored := cloneSession(session)
+	s.sessionsByToken[session.TokenHash] = stored
+	s.sessionTokenByID[session.ID] = session.TokenHash
+	return nil
+}
+
+func (s *MemoryStore) GetSessionByTokenHash(_ context.Context, tokenHash string) (Session, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, ok := s.sessionsByToken[tokenHash]
+	if !ok {
+		return Session{}, false, nil
+	}
+	return cloneSession(session), true, nil
+}
+
+func (s *MemoryStore) RevokeSession(_ context.Context, sessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tokenHash, ok := s.sessionTokenByID[sessionID]
+	if !ok {
+		return ErrSessionNotFound
+	}
+	session := s.sessionsByToken[tokenHash]
+	if session.RevokedAt != nil {
+		return nil
+	}
+	now := time.Now().UTC()
+	session.RevokedAt = &now
+	s.sessionsByToken[tokenHash] = session
+	return nil
+}
+
+func cloneSession(session Session) Session {
+	clone := session
+	if session.RevokedAt != nil {
+		value := *session.RevokedAt
+		clone.RevokedAt = &value
+	}
+	return clone
+}
+
+var _ Repository = (*MemoryStore)(nil)
+var _ AuthRepository = (*MemoryStore)(nil)

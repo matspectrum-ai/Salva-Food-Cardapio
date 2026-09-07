@@ -41,6 +41,7 @@ type Querier interface {
 	ListOrderItems(ctx context.Context, arg ListOrderItemsParams) ([]OrderItem, error)
 	ListOrders(ctx context.Context, tenantID pgtype.UUID) ([]Order, error)
 	ListPendingOutboxEvents(ctx context.Context, limit int32) ([]OutboxEvent, error)
+	ListTenantMembershipsByUser(ctx context.Context, userID pgtype.UUID) ([]TenantMembership, error)
 	LockOrderForUpdate(ctx context.Context, arg LockOrderForUpdateParams) (Order, error)
 	MarkOutboxEventPublished(ctx context.Context, id pgtype.UUID) error
 	RevokeAuthSession(ctx context.Context, id pgtype.UUID) (AuthSession, error)

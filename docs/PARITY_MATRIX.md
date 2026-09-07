@@ -122,6 +122,8 @@ Legend:
 | SaaS | cadastro/listagem de colaboradores | CONFIRMED_AUTH | CORE_TESTED |
 | SaaS | cargo descritivo + permissões granulares por colaborador | CONFIRMED_AUTH | CORE_TESTED |
 | SaaS | política de senha do colaborador | CONFIRMED_AUTH | CORE_TESTED |
+| SaaS | autenticação por e-mail/senha + sessão | INFERRED | CORE_TESTED |
+| SaaS | sessão revogável com tenant ativo | INFERRED | CORE_TESTED |
 | SaaS | enforcement exato de cada permissão | UNKNOWN | TODO |
 | SaaS | multiunidade/organização interna exata | UNKNOWN | TODO |
 | SaaS | billing/assinatura/admin interno | UNKNOWN | TODO |

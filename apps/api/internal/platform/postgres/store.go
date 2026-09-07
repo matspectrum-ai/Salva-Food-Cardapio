@@ -636,3 +636,106 @@ func (s *Store) SetMembershipStatus(ctx context.Context, tenantIDValue, userIDVa
 }
 
 var _ identity.Repository = (*Store)(nil)
+
+func (s *Store) GetUserByID(ctx context.Context, userIDValue string) (identity.User, bool, error) {
+	userID, err := parseUUID(userIDValue)
+	if err != nil {
+		return identity.User{}, false, err
+	}
+	row, err := s.q.GetAppUserByID(ctx, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return identity.User{}, false, nil
+	}
+	if err != nil {
+		return identity.User{}, false, err
+	}
+	user, err := mapIdentityUser(row)
+	if err != nil {
+		return identity.User{}, false, err
+	}
+	return user, true, nil
+}
+
+func (s *Store) ListMembershipsByUser(ctx context.Context, userIDValue string) ([]identity.Membership, error) {
+	userID, err := parseUUID(userIDValue)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ListTenantMembershipsByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]identity.Membership, 0, len(rows))
+	for _, row := range rows {
+		membership, err := mapIdentityMembership(row)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, membership)
+	}
+	return result, nil
+}
+
+func mapIdentitySession(row db.AuthSession) identity.Session {
+	session := identity.Session{
+		ID: formatUUID(row.ID), UserID: formatUUID(row.UserID),
+		ActiveTenantID: formatUUID(row.ActiveTenantID), TokenHash: row.TokenHash,
+		ExpiresAt: row.ExpiresAt.Time,
+	}
+	if row.RevokedAt.Valid {
+		revoked := row.RevokedAt.Time
+		session.RevokedAt = &revoked
+	}
+	return session
+}
+
+func (s *Store) CreateSession(ctx context.Context, session identity.Session) error {
+	id, err := parseUUID(session.ID)
+	if err != nil {
+		return err
+	}
+	userID, err := parseUUID(session.UserID)
+	if err != nil {
+		return err
+	}
+	tenantID, err := parseUUID(session.ActiveTenantID)
+	if err != nil {
+		return err
+	}
+	_, err = s.q.CreateAuthSession(ctx, db.CreateAuthSessionParams{
+		ID: id, UserID: userID, ActiveTenantID: tenantID,
+		TokenHash: session.TokenHash,
+		ExpiresAt: pgtype.Timestamptz{Time: session.ExpiresAt, Valid: true},
+	})
+	if pgConstraint(err, "23505", "") {
+		return identity.ErrSessionAlreadyExists
+	}
+	if pgConstraint(err, "23503", "auth_sessions_membership_fk") {
+		return identity.ErrTenantAccessDenied
+	}
+	return err
+}
+func (s *Store) GetSessionByTokenHash(ctx context.Context, tokenHash string) (identity.Session, bool, error) {
+	row, err := s.q.GetAuthSessionByTokenHash(ctx, tokenHash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return identity.Session{}, false, nil
+	}
+	if err != nil {
+		return identity.Session{}, false, err
+	}
+	return mapIdentitySession(row), true, nil
+}
+
+func (s *Store) RevokeSession(ctx context.Context, sessionIDValue string) error {
+	sessionID, err := parseUUID(sessionIDValue)
+	if err != nil {
+		return err
+	}
+	_, err = s.q.RevokeAuthSession(ctx, sessionID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return identity.ErrSessionNotFound
+	}
+	return err
+}
+
+var _ identity.AuthRepository = (*Store)(nil)
