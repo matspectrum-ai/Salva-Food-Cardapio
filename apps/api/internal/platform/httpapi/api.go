@@ -1,11 +1,14 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/catalog"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
@@ -14,22 +17,28 @@ import (
 type IDGenerator func() string
 
 type API struct {
-	catalog      *catalog.MemoryStore
-	orders       *orders.MemoryStore
+	catalog      catalog.Repository
+	orders       orders.Repository
 	orderService *orders.Service
 	newID        IDGenerator
 }
 
 type catalogReader struct {
-	store *catalog.MemoryStore
+	store catalog.Repository
 }
 
-func (r catalogReader) LookupOrderProduct(tenantID, itemID string) (orders.CatalogProduct, error) {
-	item, ok := r.store.GetItem(tenantID, itemID)
+func (r catalogReader) LookupOrderProduct(ctx context.Context, tenantID, itemID string) (orders.CatalogProduct, error) {
+	item, ok, err := r.store.GetItem(ctx, tenantID, itemID)
+	if err != nil {
+		return orders.CatalogProduct{}, err
+	}
 	if !ok {
 		return orders.CatalogProduct{}, catalog.ErrItemNotFound
 	}
-	category, ok := r.store.GetCategory(tenantID, item.CategoryID)
+	category, ok, err := r.store.GetCategory(ctx, tenantID, item.CategoryID)
+	if err != nil {
+		return orders.CatalogProduct{}, err
+	}
 	if !ok {
 		return orders.CatalogProduct{}, catalog.ErrCategoryNotFound
 	}
@@ -42,7 +51,7 @@ func (r catalogReader) LookupOrderProduct(tenantID, itemID string) (orders.Catal
 	}, nil
 }
 
-func New(catalogStore *catalog.MemoryStore, orderStore *orders.MemoryStore, newID IDGenerator) *API {
+func New(catalogStore catalog.Repository, orderStore orders.Repository, newID IDGenerator) *API {
 	return &API{
 		catalog:      catalogStore,
 		orders:       orderStore,
@@ -81,7 +90,7 @@ func (a *API) createCategory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if err := a.catalog.CreateCategory(category); err != nil {
+	if err := a.catalog.CreateCategory(r.Context(), category); err != nil {
 		writeError(w, http.StatusConflict, err)
 		return
 	}
@@ -93,7 +102,12 @@ func (a *API) listCategories(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": a.catalog.ListCategories(tenantID)})
+	categories, err := a.catalog.ListCategories(r.Context(), tenantID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": categories})
 }
 
 type createItemRequest struct {
@@ -113,7 +127,11 @@ func (a *API) createItem(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	category, ok := a.catalog.GetCategory(tenantID, req.CategoryID)
+	category, ok, err := a.catalog.GetCategory(r.Context(), tenantID, req.CategoryID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusNotFound, catalog.ErrCategoryNotFound)
 		return
@@ -124,7 +142,7 @@ func (a *API) createItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item.SoldByWeight = req.SoldByWeight
-	if err := a.catalog.CreateItem(item); err != nil {
+	if err := a.catalog.CreateItem(r.Context(), item); err != nil {
 		writeError(w, http.StatusConflict, err)
 		return
 	}
@@ -136,7 +154,12 @@ func (a *API) listItems(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": a.catalog.ListItems(tenantID, r.URL.Query().Get("category_id"))})
+	items, err := a.catalog.ListItems(r.Context(), tenantID, r.URL.Query().Get("category_id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": items})
 }
 func (a *API) createOrder(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := tenantFromRequest(w, r)
@@ -147,7 +170,7 @@ func (a *API) createOrder(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &input) {
 		return
 	}
-	order, replay, err := a.orderService.Create(tenantID, r.Header.Get("Idempotency-Key"), input)
+	order, replay, err := a.orderService.Create(r.Context(), tenantID, r.Header.Get("Idempotency-Key"), input)
 	if err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, orders.ErrIdempotencyConflict) {
@@ -170,7 +193,12 @@ func (a *API) listOrders(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": a.orders.List(tenantID)})
+	result, err := a.orders.List(r.Context(), tenantID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": result})
 }
 
 type transitionOrderRequest struct {
@@ -186,7 +214,7 @@ func (a *API) transitionOrder(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	order, err := a.orders.Transition(tenantID, r.PathValue("id"), req.Status)
+	order, err := a.orders.Transition(r.Context(), tenantID, r.PathValue("id"), req.Status)
 	if err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, orders.ErrOrderNotFound) {
@@ -202,6 +230,10 @@ func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
 	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	if tenantID == "" {
 		writeError(w, http.StatusBadRequest, errors.New("X-Tenant-ID header is required"))
+		return "", false
+	}
+	if _, err := uuid.Parse(tenantID); err != nil {
+		writeError(w, http.StatusBadRequest, errors.New("X-Tenant-ID must be a valid UUID"))
 		return "", false
 	}
 	return tenantID, true

@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"context"
 	"errors"
 	"sort"
 	"sync"
@@ -11,6 +12,15 @@ var (
 	ErrCategoryNotFound = errors.New("category not found")
 	ErrItemNotFound     = errors.New("item not found")
 )
+
+type Repository interface {
+	CreateCategory(context.Context, Category) error
+	GetCategory(context.Context, string, string) (Category, bool, error)
+	ListCategories(context.Context, string) ([]Category, error)
+	CreateItem(context.Context, Item) error
+	GetItem(context.Context, string, string) (Item, bool, error)
+	ListItems(context.Context, string, string) ([]Item, error)
+}
 
 type MemoryStore struct {
 	mu         sync.RWMutex
@@ -25,7 +35,7 @@ func NewMemoryStore() *MemoryStore {
 	}
 }
 
-func (s *MemoryStore) CreateCategory(category Category) error {
+func (s *MemoryStore) CreateCategory(_ context.Context, category Category) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.categories[category.TenantID] == nil {
@@ -37,14 +47,14 @@ func (s *MemoryStore) CreateCategory(category Category) error {
 	s.categories[category.TenantID][category.ID] = category
 	return nil
 }
-func (s *MemoryStore) GetCategory(tenantID, id string) (Category, bool) {
+func (s *MemoryStore) GetCategory(_ context.Context, tenantID, id string) (Category, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	category, ok := s.categories[tenantID][id]
-	return category, ok
+	return category, ok, nil
 }
 
-func (s *MemoryStore) ListCategories(tenantID string) []Category {
+func (s *MemoryStore) ListCategories(_ context.Context, tenantID string) ([]Category, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	result := make([]Category, 0, len(s.categories[tenantID]))
@@ -57,10 +67,10 @@ func (s *MemoryStore) ListCategories(tenantID string) []Category {
 		}
 		return result[i].SortOrder < result[j].SortOrder
 	})
-	return result
+	return result, nil
 }
 
-func (s *MemoryStore) CreateItem(item Item) error {
+func (s *MemoryStore) CreateItem(_ context.Context, item Item) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.categories[item.TenantID][item.CategoryID]; !ok {
@@ -75,14 +85,14 @@ func (s *MemoryStore) CreateItem(item Item) error {
 	s.items[item.TenantID][item.ID] = item
 	return nil
 }
-func (s *MemoryStore) GetItem(tenantID, id string) (Item, bool) {
+func (s *MemoryStore) GetItem(_ context.Context, tenantID, id string) (Item, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	item, ok := s.items[tenantID][id]
-	return item, ok
+	return item, ok, nil
 }
 
-func (s *MemoryStore) ListItems(tenantID, categoryID string) []Item {
+func (s *MemoryStore) ListItems(_ context.Context, tenantID, categoryID string) ([]Item, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	result := make([]Item, 0)
@@ -97,5 +107,5 @@ func (s *MemoryStore) ListItems(tenantID, categoryID string) []Item {
 		}
 		return result[i].SortOrder < result[j].SortOrder
 	})
-	return result
+	return result, nil
 }

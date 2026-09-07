@@ -1,4 +1,4 @@
-.PHONY: test ci api-test api-run sqlc-generate db-validate
+.PHONY: test ci api-test api-run sqlc-generate db-validate db-test
 
 test: api-test
 
@@ -15,3 +15,6 @@ sqlc-generate:
 
 db-validate:
 	./scripts/validate-db.sh
+
+db-test:
+	./scripts/test-postgres.sh

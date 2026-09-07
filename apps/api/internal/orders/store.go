@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"context"
 	"errors"
 	"sort"
 	"sync"
@@ -17,6 +18,14 @@ type idempotencyRecord struct {
 	Fingerprint string
 }
 
+type Repository interface {
+	Create(context.Context, *Order, string, string) (*Order, bool, error)
+	Get(context.Context, string, string) (*Order, bool, error)
+	List(context.Context, string) ([]*Order, error)
+	Transition(context.Context, string, string, Status) (*Order, error)
+	Replay(context.Context, string, string, string) (*Order, bool, error)
+}
+
 type MemoryStore struct {
 	mu          sync.RWMutex
 	orders      map[string]map[string]*Order
@@ -30,7 +39,7 @@ func NewMemoryStore() *MemoryStore {
 	}
 }
 
-func (s *MemoryStore) Create(order *Order, key, fingerprint string) (*Order, bool, error) {
+func (s *MemoryStore) Create(_ context.Context, order *Order, key, fingerprint string) (*Order, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.orders[order.TenantID] == nil {
@@ -55,17 +64,17 @@ func (s *MemoryStore) Create(order *Order, key, fingerprint string) (*Order, boo
 	return cloneOrder(stored), false, nil
 }
 
-func (s *MemoryStore) Get(tenantID, id string) (*Order, bool) {
+func (s *MemoryStore) Get(_ context.Context, tenantID, id string) (*Order, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	order, ok := s.orders[tenantID][id]
 	if !ok {
-		return nil, false
+		return nil, false, nil
 	}
-	return cloneOrder(order), true
+	return cloneOrder(order), true, nil
 }
 
-func (s *MemoryStore) List(tenantID string) []*Order {
+func (s *MemoryStore) List(_ context.Context, tenantID string) ([]*Order, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	result := make([]*Order, 0, len(s.orders[tenantID]))
@@ -73,9 +82,9 @@ func (s *MemoryStore) List(tenantID string) []*Order {
 		result = append(result, cloneOrder(order))
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
-	return result
+	return result, nil
 }
-func (s *MemoryStore) Transition(tenantID, id string, next Status) (*Order, error) {
+func (s *MemoryStore) Transition(_ context.Context, tenantID, id string, next Status) (*Order, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	order, ok := s.orders[tenantID][id]
@@ -97,7 +106,7 @@ func cloneOrder(order *Order) *Order {
 	copy(clone.Items, order.Items)
 	return &clone
 }
-func (s *MemoryStore) Replay(tenantID, key, fingerprint string) (*Order, bool, error) {
+func (s *MemoryStore) Replay(_ context.Context, tenantID, key, fingerprint string) (*Order, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	record, exists := s.idempotency[tenantID][key]

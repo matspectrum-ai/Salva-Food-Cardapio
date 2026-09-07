@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -22,7 +23,7 @@ type CatalogProduct struct {
 }
 
 type CatalogReader interface {
-	LookupOrderProduct(tenantID, itemID string) (CatalogProduct, error)
+	LookupOrderProduct(context.Context, string, string) (CatalogProduct, error)
 }
 
 type IDGenerator func() string
@@ -38,15 +39,15 @@ type CreateInput struct {
 }
 
 type Service struct {
-	store   *MemoryStore
+	store   Repository
 	catalog CatalogReader
 	newID   IDGenerator
 }
 
-func NewService(store *MemoryStore, catalog CatalogReader, newID IDGenerator) *Service {
+func NewService(store Repository, catalog CatalogReader, newID IDGenerator) *Service {
 	return &Service{store: store, catalog: catalog, newID: newID}
 }
-func (s *Service) Create(tenantID, idempotencyKey string, input CreateInput) (*Order, bool, error) {
+func (s *Service) Create(ctx context.Context, tenantID, idempotencyKey string, input CreateInput) (*Order, bool, error) {
 	if strings.TrimSpace(idempotencyKey) == "" {
 		return nil, false, ErrIdempotencyKeyRequired
 	}
@@ -54,13 +55,13 @@ func (s *Service) Create(tenantID, idempotencyKey string, input CreateInput) (*O
 	if err != nil {
 		return nil, false, err
 	}
-	if existing, replay, err := s.store.Replay(tenantID, idempotencyKey, fingerprint); err != nil || replay {
+	if existing, replay, err := s.store.Replay(ctx, tenantID, idempotencyKey, fingerprint); err != nil || replay {
 		return existing, replay, err
 	}
 
 	items := make([]LineItemSnapshot, 0, len(input.Items))
 	for _, requested := range input.Items {
-		product, err := s.catalog.LookupOrderProduct(tenantID, requested.ItemID)
+		product, err := s.catalog.LookupOrderProduct(ctx, tenantID, requested.ItemID)
 		if err != nil {
 			return nil, false, err
 		}
@@ -79,7 +80,7 @@ func (s *Service) Create(tenantID, idempotencyKey string, input CreateInput) (*O
 	if err != nil {
 		return nil, false, err
 	}
-	return s.store.Create(order, idempotencyKey, fingerprint)
+	return s.store.Create(ctx, order, idempotencyKey, fingerprint)
 }
 
 func fingerprintInput(input CreateInput) (string, error) {

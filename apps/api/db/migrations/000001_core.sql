@@ -85,7 +85,7 @@ CREATE TABLE order_items (
 CREATE TABLE order_idempotency (
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     idempotency_key TEXT NOT NULL CHECK (btrim(idempotency_key) <> ''),
-    request_fingerprint CHAR(64) NOT NULL,
+    request_fingerprint TEXT NOT NULL CHECK (char_length(request_fingerprint) = 64),
     order_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, idempotency_key),

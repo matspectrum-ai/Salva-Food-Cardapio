@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
@@ -11,7 +12,7 @@ type fakeCatalog struct {
 	calls    int
 }
 
-func (f *fakeCatalog) LookupOrderProduct(_, itemID string) (CatalogProduct, error) {
+func (f *fakeCatalog) LookupOrderProduct(_ context.Context, _, itemID string) (CatalogProduct, error) {
 	f.calls++
 	if f.err != nil {
 		return CatalogProduct{}, f.err
@@ -28,7 +29,7 @@ func TestServiceCreatesSnapshotFromCatalog(t *testing.T) {
 		"item-1": {ID: "item-1", Name: "Pizza", PriceCents: 3000},
 	}}
 	service := NewService(NewMemoryStore(), catalog, func() string { return "order-1" })
-	order, replay, err := service.Create("tenant", "idem-1", CreateInput{
+	order, replay, err := service.Create(context.Background(), "tenant", "idem-1", CreateInput{
 		Source: "PDV",
 		Items:  []CreateLineInput{{ItemID: "item-1", Quantity: 2}},
 	})
@@ -46,12 +47,12 @@ func TestServiceReplaysBeforeReadingCatalogAgain(t *testing.T) {
 	service := NewService(NewMemoryStore(), catalog, func() string { return "order-1" })
 	input := CreateInput{Source: "PDV", Items: []CreateLineInput{{ItemID: "item-1", Quantity: 1}}}
 
-	first, _, err := service.Create("tenant", "idem-1", input)
+	first, _, err := service.Create(context.Background(), "tenant", "idem-1", input)
 	if err != nil {
 		t.Fatal(err)
 	}
 	catalog.products["item-1"] = CatalogProduct{ID: "item-1", Name: "Pizza", PriceCents: 9999, SoldOut: true}
-	second, replay, err := service.Create("tenant", "idem-1", input)
+	second, replay, err := service.Create(context.Background(), "tenant", "idem-1", input)
 	if err != nil || !replay {
 		t.Fatalf("replay=%v err=%v", replay, err)
 	}
@@ -70,10 +71,10 @@ func TestServiceRejectsUnavailableProductAndMissingIdempotencyKey(t *testing.T) 
 	service := NewService(NewMemoryStore(), catalog, func() string { return "order-1" })
 	input := CreateInput{Source: "PDV", Items: []CreateLineInput{{ItemID: "item-1", Quantity: 1}}}
 
-	if _, _, err := service.Create("tenant", "", input); err != ErrIdempotencyKeyRequired {
+	if _, _, err := service.Create(context.Background(), "tenant", "", input); err != ErrIdempotencyKeyRequired {
 		t.Fatalf("err = %v, want missing idempotency key", err)
 	}
-	if _, _, err := service.Create("tenant", "idem-1", input); err != ErrCatalogItemUnavailable {
+	if _, _, err := service.Create(context.Background(), "tenant", "idem-1", input); err != ErrCatalogItemUnavailable {
 		t.Fatalf("err = %v, want unavailable", err)
 	}
 }

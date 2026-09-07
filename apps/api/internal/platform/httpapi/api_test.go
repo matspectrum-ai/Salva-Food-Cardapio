@@ -13,6 +13,11 @@ import (
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
 )
 
+const (
+	tenantA = "11111111-1111-4111-8111-111111111111"
+	tenantB = "22222222-2222-4222-8222-222222222222"
+)
+
 type testHarness struct {
 	handler http.Handler
 }
@@ -21,7 +26,7 @@ func newTestHarness() testHarness {
 	catalogStore := catalog.NewMemoryStore()
 	orderStore := orders.NewMemoryStore()
 	var sequence atomic.Int64
-	newID := func() string { return fmt.Sprintf("id-%d", sequence.Add(1)) }
+	newID := func() string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", sequence.Add(1)) }
 	return testHarness{handler: New(catalogStore, orderStore, newID).Handler()}
 }
 func (h testHarness) do(t *testing.T, method, path, tenantID string, body any, headers map[string]string) *httptest.ResponseRecorder {
@@ -59,7 +64,7 @@ func decodeResponse[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
 }
 func TestCatalogOrderLifecycleHTTP(t *testing.T) {
 	h := newTestHarness()
-	categoryRec := h.do(t, http.MethodPost, "/api/v1/catalog/categories", "tenant-a", map[string]any{
+	categoryRec := h.do(t, http.MethodPost, "/api/v1/catalog/categories", tenantA, map[string]any{
 		"name": "Lanches", "sort_order": 0,
 	}, nil)
 	if categoryRec.Code != http.StatusCreated {
@@ -67,7 +72,7 @@ func TestCatalogOrderLifecycleHTTP(t *testing.T) {
 	}
 	category := decodeResponse[catalog.Category](t, categoryRec)
 
-	itemRec := h.do(t, http.MethodPost, "/api/v1/catalog/items", "tenant-a", map[string]any{
+	itemRec := h.do(t, http.MethodPost, "/api/v1/catalog/items", tenantA, map[string]any{
 		"category_id":    category.ID,
 		"name":           "X-Burger",
 		"price_cents":    2590,
@@ -83,7 +88,7 @@ func TestCatalogOrderLifecycleHTTP(t *testing.T) {
 		"source": "PDV",
 		"items":  []map[string]any{{"item_id": item.ID, "quantity": 2}},
 	}
-	orderRec := h.do(t, http.MethodPost, "/api/v1/orders", "tenant-a", orderBody, map[string]string{"Idempotency-Key": "order-001"})
+	orderRec := h.do(t, http.MethodPost, "/api/v1/orders", tenantA, orderBody, map[string]string{"Idempotency-Key": "order-001"})
 	if orderRec.Code != http.StatusCreated {
 		t.Fatalf("create order: got %d body=%s", orderRec.Code, orderRec.Body.String())
 	}
@@ -93,7 +98,7 @@ func TestCatalogOrderLifecycleHTTP(t *testing.T) {
 	}
 
 	for _, next := range []orders.Status{orders.StatusProduction, orders.StatusReady, orders.StatusFinalized} {
-		rec := h.do(t, http.MethodPost, fmt.Sprintf("/api/v1/orders/%s/transitions", order.ID), "tenant-a", map[string]any{
+		rec := h.do(t, http.MethodPost, fmt.Sprintf("/api/v1/orders/%s/transitions", order.ID), tenantA, map[string]any{
 			"status": next,
 		}, nil)
 		if rec.Code != http.StatusOK {
@@ -105,7 +110,7 @@ func TestCatalogOrderLifecycleHTTP(t *testing.T) {
 		}
 	}
 
-	invalid := h.do(t, http.MethodPost, fmt.Sprintf("/api/v1/orders/%s/transitions", order.ID), "tenant-a", map[string]any{
+	invalid := h.do(t, http.MethodPost, fmt.Sprintf("/api/v1/orders/%s/transitions", order.ID), tenantA, map[string]any{
 		"status": orders.StatusCancelled,
 	}, nil)
 	if invalid.Code != http.StatusBadRequest {
@@ -115,21 +120,21 @@ func TestCatalogOrderLifecycleHTTP(t *testing.T) {
 
 func TestOrderIdempotencyHTTP(t *testing.T) {
 	h := newTestHarness()
-	categoryRec := h.do(t, http.MethodPost, "/api/v1/catalog/categories", "tenant-a", map[string]any{"name": "Pizzas", "sort_order": 0}, nil)
+	categoryRec := h.do(t, http.MethodPost, "/api/v1/catalog/categories", tenantA, map[string]any{"name": "Pizzas", "sort_order": 0}, nil)
 	category := decodeResponse[catalog.Category](t, categoryRec)
-	itemRec := h.do(t, http.MethodPost, "/api/v1/catalog/items", "tenant-a", map[string]any{
+	itemRec := h.do(t, http.MethodPost, "/api/v1/catalog/items", tenantA, map[string]any{
 		"category_id": category.ID, "name": "Calabresa", "price_cents": 4000, "sort_order": 0,
 	}, nil)
 	item := decodeResponse[catalog.Item](t, itemRec)
 	body := map[string]any{"source": "STOREFRONT", "items": []map[string]any{{"item_id": item.ID, "quantity": 1}}}
 
-	first := h.do(t, http.MethodPost, "/api/v1/orders", "tenant-a", body, map[string]string{"Idempotency-Key": "checkout-001"})
+	first := h.do(t, http.MethodPost, "/api/v1/orders", tenantA, body, map[string]string{"Idempotency-Key": "checkout-001"})
 	if first.Code != http.StatusCreated {
 		t.Fatalf("first create: got %d body=%s", first.Code, first.Body.String())
 	}
 	firstOrder := decodeResponse[orders.Order](t, first)
 
-	replay := h.do(t, http.MethodPost, "/api/v1/orders", "tenant-a", body, map[string]string{"Idempotency-Key": "checkout-001"})
+	replay := h.do(t, http.MethodPost, "/api/v1/orders", tenantA, body, map[string]string{"Idempotency-Key": "checkout-001"})
 	if replay.Code != http.StatusCreated || replay.Header().Get("Idempotent-Replay") != "true" {
 		t.Fatalf("replay: got %d replay=%q body=%s", replay.Code, replay.Header().Get("Idempotent-Replay"), replay.Body.String())
 	}
@@ -139,7 +144,7 @@ func TestOrderIdempotencyHTTP(t *testing.T) {
 	}
 
 	conflictBody := map[string]any{"source": "STOREFRONT", "items": []map[string]any{{"item_id": item.ID, "quantity": 2}}}
-	conflict := h.do(t, http.MethodPost, "/api/v1/orders", "tenant-a", conflictBody, map[string]string{"Idempotency-Key": "checkout-001"})
+	conflict := h.do(t, http.MethodPost, "/api/v1/orders", tenantA, conflictBody, map[string]string{"Idempotency-Key": "checkout-001"})
 	if conflict.Code != http.StatusConflict {
 		t.Fatalf("idempotency conflict: got %d body=%s", conflict.Code, conflict.Body.String())
 	}
@@ -147,12 +152,12 @@ func TestOrderIdempotencyHTTP(t *testing.T) {
 
 func TestTenantIsolationHTTP(t *testing.T) {
 	h := newTestHarness()
-	created := h.do(t, http.MethodPost, "/api/v1/catalog/categories", "tenant-a", map[string]any{"name": "Bebidas", "sort_order": 0}, nil)
+	created := h.do(t, http.MethodPost, "/api/v1/catalog/categories", tenantA, map[string]any{"name": "Bebidas", "sort_order": 0}, nil)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create category: got %d", created.Code)
 	}
 
-	otherTenant := h.do(t, http.MethodGet, "/api/v1/catalog/categories", "tenant-b", nil, nil)
+	otherTenant := h.do(t, http.MethodGet, "/api/v1/catalog/categories", tenantB, nil, nil)
 	if otherTenant.Code != http.StatusOK {
 		t.Fatalf("list tenant-b: got %d", otherTenant.Code)
 	}
@@ -169,5 +174,10 @@ func TestTenantIsolationHTTP(t *testing.T) {
 	missingTenant := h.do(t, http.MethodGet, "/api/v1/orders", "", nil, nil)
 	if missingTenant.Code != http.StatusBadRequest {
 		t.Fatalf("missing tenant header: got %d", missingTenant.Code)
+	}
+
+	invalidTenant := h.do(t, http.MethodGet, "/api/v1/orders", "not-a-uuid", nil, nil)
+	if invalidTenant.Code != http.StatusBadRequest {
+		t.Fatalf("invalid tenant UUID: got %d", invalidTenant.Code)
 	}
 }
