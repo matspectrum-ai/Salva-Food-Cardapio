@@ -31,3 +31,23 @@ Rota: `/main/deliveryman/regions`
 - dispatch e tracking;
 - relatórios individuais de entregador;
 - configuração do módulo Entregadores.
+## DEL-003 — Cadastro de entregadores
+Status: `CONFIRMED_AUTH`
+Rota: `/main/deliveryman/register`
+
+A tela possui estado vazio, criação de entregador e acesso à `Central`. A UI informa suporte a múltiplos entregadores.
+
+## DEL-004 — Configurações de entregadores
+Status: `CONFIRMED_AUTH`
+Rota: `/main/deliveryman/config`
+
+### Regra observada
+Existe opção para enviar automaticamente ao WhatsApp do entregador, quando o pedido fica pronto para entrega:
+- nome e endereço do cliente;
+- valor do pedido;
+- forma de pagamento.
+
+A configuração também oferece atalhos para relatório e cadastro.
+
+### Requisito de segurança
+O Salva Food deve minimizar PII enviada ao entregador, registrar finalidade/acesso e permitir expiração do acesso aos dados após conclusão da entrega.

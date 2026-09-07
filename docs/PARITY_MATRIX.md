@@ -46,7 +46,7 @@ Legend:
 | Hall | leitura de comanda por código/QR | CONFIRMED_PUBLIC | TODO |
 | Hall | balança integrada | CONFIRMED_PUBLIC | TODO |
 | Kitchen | KDS | CONFIRMED_AUTH | TODO |
-| Couriers | cadastro/edição/exclusão de entregadores | CONFIRMED_PUBLIC | TODO |
+| Couriers | cadastro/edição/exclusão de entregadores | CONFIRMED_AUTH | TODO |
 | Couriers | centrais de entregadores | CONFIRMED_PUBLIC | TODO |
 | Couriers | veículo e diária | CONFIRMED_PUBLIC | TODO |
 | Delivery AI | atribuição de pedido ao entregador | CONFIRMED_PUBLIC | TODO |
@@ -72,8 +72,8 @@ Legend:
 | Payments | cartão online | CONFIRMED_AUTH | TODO |
 | Payments | NuPay/Google Pay/Apple Pay | CONFIRMED_PUBLIC | TODO |
 | Payments | antifraude | CONFIRMED_PUBLIC | TODO |
-| Cash | abertura/fechamento de caixa | CONFIRMED_PUBLIC | TODO |
-| Cash | entradas/saídas/retiradas/despesas | CONFIRMED_PUBLIC | TODO |
+| Cash | abertura/fechamento de caixa | CONFIRMED_AUTH | TODO |
+| Cash | entradas/saídas/retiradas/despesas | CONFIRMED_AUTH | TODO |
 | Cash | vendas por forma de pagamento | CONFIRMED_PUBLIC | TODO |
 | Inventory | posição de estoque | CONFIRMED_PUBLIC | TODO |
 | Inventory | insumos | CONFIRMED_PUBLIC | TODO |
@@ -107,6 +107,14 @@ Legend:
 | Bot | imagens de cardápio e promoção | CONFIRMED_AUTH | TODO |
 | Reports | módulos Geral/Caixas/Clientes/Entradas/Pedidos/Funil/etc. na navegação | CONFIRMED_AUTH | TODO |
 | Fiscal | módulos Relatório/Configuração/Inutilização NFC-e na navegação | CONFIRMED_AUTH | TODO |
+| Fiscal | relatório NFC-e com período e modos Delivery/Balcão/Salão | CONFIRMED_AUTH | TODO |
+| Fiscal | configuração empresarial/fiscal e categorias tributárias | CONFIRMED_AUTH | TODO |
+| Fiscal | inutilização e estado de certificado digital | CONFIRMED_AUTH | TODO |
+| Reports | relatório geral: faturamento/ticket/pedidos/clientes | CONFIRMED_AUTH | TODO |
+| Reports | relatório de entradas: meios de pagamento/taxas/tickets | CONFIRMED_AUTH | TODO |
+| Reports | relatório de pedidos: filtros/export/NF em lote | CONFIRMED_AUTH | TODO |
+| Cash | abertura automática e impressão de fechamento/retirada/suprimento | CONFIRMED_AUTH | TODO |
+| Couriers | envio de dados do pedido ao WhatsApp do entregador | CONFIRMED_AUTH | TODO |
 | Settings | 10 subseções de configuração do estabelecimento | CONFIRMED_AUTH | TODO |
 | Settings | 8 subseções de configuração do cardápio digital | CONFIRMED_AUTH | TODO |
 | Integrations | catálogo + tabs iFood/Outras + credenciais por loja | CONFIRMED_AUTH | TODO |
