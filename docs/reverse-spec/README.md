@@ -22,3 +22,12 @@ Uma tela semelhante não significa paridade. Cada fluxo deve registrar rota, est
 - `navigation.md`: taxonomia, rotas e shell global.
 - `orders.md`: pedidos em tempo real e agendados.
 - `catalog.md`: gestor de cardápio e seus submódulos.
+- `hall.md`: mesas, comandas e App do Garçom.
+- `pdv.md`: PDV e atalhos operacionais.
+- `delivery.md`: entregas e regiões.
+- `kds.md`: mapa/telas de cozinha.
+- `payments.md`: onboarding e métodos de pagamento online.
+- `robot.md`: intents, personalidades e configurações do robô.
+- `growth.md`: recuperador, cashback, cupons e promoções.
+- `integrations.md`: catálogo de integrações e canais.
+- `settings.md`: cardápio digital e estabelecimento.

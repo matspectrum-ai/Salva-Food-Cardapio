@@ -53,3 +53,28 @@ Foram vistas múltiplas categorias, suficientes para confirmar listagem e seleç
 - Comportamento da ação de link.
 - Semântica e limites da importação inteligente por fotos.
 - Regras de merge/conflito na importação do iFood.
+
+## CAT-003 — Criação de item
+Status: `CONFIRMED_AUTH`
+Rota: `/main/menu-v4/item/form?option=add`
+
+### Wizard observado
+1. `Item`
+2. `Adicionais`
+3. `Classificações`
+4. `Disponibilidade`
+
+### Etapa 1 — Item
+- Categoria obrigatória.
+- Nome do item obrigatório.
+- Descrição com limite visual de 1000 caracteres.
+- Ação `Melhorar com IA` para a descrição.
+- Upload de foto por clique ou drag-and-drop.
+- Formatos indicados: PNG, JPG/JPEG, WEBP e HEIC.
+- Limite de arquivo indicado: 20 MB.
+- Resolução mínima indicada: 200 px; recomendação de foto quadrada.
+- Preço com modo `Preço fixo` e ação `Personalizar`.
+- Opção `Item vendido por kg`.
+- Navegação por `Anterior`/`Próximo` e ação `Salvar alterações`.
+
+As etapas 2–4 ainda não foram inspecionadas porque o wizard bloqueia avanço sem satisfazer os campos obrigatórios da etapa 1.
