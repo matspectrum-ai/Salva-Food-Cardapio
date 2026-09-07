@@ -1,0 +1,291 @@
+openapi: 3.1.0
+info:
+  title: Salva Food API
+  version: 0.1.0
+servers:
+  - url: /
+paths:
+  /api/v1/catalog/categories:
+    get:
+      summary: List catalog categories
+      parameters:
+        - $ref: '#/components/parameters/TenantID'
+      responses:
+        '200':
+          description: Categories ordered by sort_order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+    post:
+      summary: Create a catalog category
+      parameters:
+        - $ref: '#/components/parameters/TenantID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryRequest'
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/v1/catalog/items:
+    get:
+      summary: List catalog items
+      parameters:
+        - $ref: '#/components/parameters/TenantID'
+        - in: query
+          name: category_id
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Items ordered by sort_order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Item'
+    post:
+      summary: Create a catalog item
+      parameters:
+        - $ref: '#/components/parameters/TenantID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateItemRequest'
+      responses:
+        '201':
+          description: Item created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/orders:
+    get:
+      summary: List tenant orders
+      parameters:
+        - $ref: '#/components/parameters/TenantID'
+      responses:
+        '200':
+          description: Tenant orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+    post:
+      summary: Create an order
+      parameters:
+        - $ref: '#/components/parameters/TenantID'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order created or idempotently replayed
+          headers:
+            Idempotent-Replay:
+              schema:
+                type: string
+                enum: ['true']
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/orders/{id}/transitions:
+    post:
+      summary: Transition an order state
+      parameters:
+        - $ref: '#/components/parameters/TenantID'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  $ref: '#/components/schemas/OrderStatus'
+      responses:
+        '200':
+          description: Order transitioned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    TenantID:
+      in: header
+      name: X-Tenant-ID
+      required: true
+      schema:
+        type: string
+      description: Temporary tenant boundary until authenticated identity/RBAC is introduced.
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Idempotency conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    Category:
+      type: object
+      required: [tenant_id, id, name, sort_order, sold_out]
+      properties:
+        tenant_id: { type: string }
+        id: { type: string }
+        name: { type: string }
+        sort_order: { type: integer, minimum: 0 }
+        sold_out: { type: boolean }
+    CreateCategoryRequest:
+      type: object
+      additionalProperties: false
+      required: [name, sort_order]
+      properties:
+        name: { type: string, minLength: 1 }
+        sort_order: { type: integer, minimum: 0 }
+    Item:
+      type: object
+      required: [tenant_id, id, category_id, name, price_cents, sort_order, sold_out, sold_by_weight]
+      properties:
+        tenant_id: { type: string }
+        id: { type: string }
+        category_id: { type: string }
+        name: { type: string }
+        price_cents: { type: integer, format: int64, minimum: 0 }
+        sort_order: { type: integer, minimum: 0 }
+        sold_out: { type: boolean }
+        sold_by_weight: { type: boolean }
+    CreateItemRequest:
+      type: object
+      additionalProperties: false
+      required: [category_id, name, price_cents, sort_order]
+      properties:
+        category_id: { type: string }
+        name: { type: string, minLength: 1 }
+        price_cents: { type: integer, format: int64, minimum: 0 }
+        sort_order: { type: integer, minimum: 0 }
+        sold_by_weight: { type: boolean, default: false }
+    OrderStatus:
+      type: string
+      enum: [ANALYSIS, PRODUCTION, READY, FINALIZED, CANCELLED]
+    OrderLine:
+      type: object
+      required: [item_id, name, quantity, unit_price_cents]
+      properties:
+        item_id: { type: string }
+        name: { type: string }
+        quantity: { type: integer, format: int64, minimum: 1 }
+        unit_price_cents: { type: integer, format: int64, minimum: 0 }
+    Order:
+      type: object
+      required: [tenant_id, id, source, status, items, total_cents]
+      properties:
+        tenant_id: { type: string }
+        id: { type: string }
+        source: { type: string }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/OrderLine' }
+        total_cents: { type: integer, format: int64, minimum: 0 }
+    CreateOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [source, items]
+      properties:
+        source: { type: string, minLength: 1 }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [item_id, quantity]
+            properties:
+              item_id: { type: string }
+              quantity: { type: integer, format: int64, minimum: 1 }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [message]
+          properties:
+            message: { type: string }

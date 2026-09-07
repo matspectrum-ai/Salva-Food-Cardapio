@@ -6,6 +6,7 @@ Legend:
 - `INFERRED`: inferência ainda não validada.
 - `UNKNOWN`: precisa de inspeção.
 - `TODO`: não implementado.
+- `CORE_TESTED`: domínio/API implementado e coberto por testes; UI/black-box ainda pendente.
 - `PARITY`: implementado + testado contra evidência.
 
 | Domain | Capability | Evidence | Build |
@@ -14,16 +15,16 @@ Legend:
 | Onboarding | importar configuração/cardápio do iFood | CONFIRMED_AUTH | TODO |
 | Onboarding | configuração manual | CONFIRMED_PUBLIC | TODO |
 | Orders | Kanban de pedidos | CONFIRMED_AUTH | TODO |
-| Orders | análise -> produção -> pronto/entrega -> finalizado | CONFIRMED_PUBLIC | TODO |
+| Orders | análise -> produção -> pronto/entrega -> finalizado | CONFIRMED_PUBLIC | CORE_TESTED |
 | Orders | busca/filtros por canal/tipo | CONFIRMED_AUTH | TODO |
 | Orders | pedidos agendados: filtros + abas Pendentes/Aceitos | CONFIRMED_AUTH | TODO |
 | Orders | editar pedido existente via PDV | CONFIRMED_PUBLIC | TODO |
 | Orders | reimprimir comanda | CONFIRMED_PUBLIC | TODO |
 | Orders | cancelar/finalizar pedido | CONFIRMED_PUBLIC | TODO |
 | Catalog | cardápio digital | CONFIRMED_AUTH | TODO |
-| Catalog | categorias e produtos no gestor | CONFIRMED_AUTH | TODO |
+| Catalog | categorias e produtos no gestor | CONFIRMED_AUTH | CORE_TESTED |
 | Catalog | complementos/combos | CONFIRMED_PUBLIC | TODO |
-| Catalog | ordenação manual e esgotamento de categoria/item | CONFIRMED_AUTH | TODO |
+| Catalog | ordenação manual e esgotamento de categoria/item | CONFIRMED_AUTH | CORE_TESTED |
 | Catalog | edição em massa (módulo) | CONFIRMED_AUTH | TODO |
 | Catalog | importação inteligente (módulo) | CONFIRMED_AUTH | TODO |
 | Catalog | importação de cardápio iFood (módulo) | CONFIRMED_AUTH | TODO |
