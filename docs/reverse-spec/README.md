@@ -30,6 +30,8 @@ Uma tela semelhante não significa paridade. Cada fluxo deve registrar rota, est
 - `robot.md`: intents, personalidades e configurações do robô.
 - `growth.md`: recuperador, cashback, cupons e promoções.
 - `integrations.md`: catálogo de integrações e canais.
-- `settings.md`: cardápio digital e estabelecimento.- `fiscal.md`: configuração, relatório e inutilização de NFC-e.
+- `settings.md`: cardápio digital e estabelecimento.
+- `fiscal.md`: configuração, relatório e inutilização de NFC-e.
 - `reports.md`: relatórios geral, caixa, entradas e pedidos.
 - `cash.md`: regras/configurações da frente de caixa.
+- `account.md`: colaboradores, credenciais e catálogo de permissões.

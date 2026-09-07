@@ -8,6 +8,28 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AppUser struct {
+	ID           pgtype.UUID        `json:"id"`
+	Name         string             `json:"name"`
+	Cpf          string             `json:"cpf"`
+	Email        string             `json:"email"`
+	Phone        string             `json:"phone"`
+	ImageUrl     pgtype.Text        `json:"image_url"`
+	PasswordHash string             `json:"password_hash"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AuthSession struct {
+	ID             pgtype.UUID        `json:"id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	ActiveTenantID pgtype.UUID        `json:"active_tenant_id"`
+	TokenHash      string             `json:"token_hash"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type CatalogCategory struct {
 	ID        pgtype.UUID        `json:"id"`
 	TenantID  pgtype.UUID        `json:"tenant_id"`
@@ -84,4 +106,14 @@ type Tenant struct {
 	ID        pgtype.UUID        `json:"id"`
 	Name      string             `json:"name"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type TenantMembership struct {
+	TenantID    pgtype.UUID        `json:"tenant_id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	Title       string             `json:"title"`
+	Status      string             `json:"status"`
+	Permissions []string           `json:"permissions"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }

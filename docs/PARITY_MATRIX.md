@@ -119,7 +119,10 @@ Legend:
 | Settings | 10 subseções de configuração do estabelecimento | CONFIRMED_AUTH | TODO |
 | Settings | 8 subseções de configuração do cardápio digital | CONFIRMED_AUTH | TODO |
 | Integrations | catálogo + tabs iFood/Outras + credenciais por loja | CONFIRMED_AUTH | TODO |
-| SaaS | permissões/RBAC exatos | UNKNOWN | TODO |
+| SaaS | cadastro/listagem de colaboradores | CONFIRMED_AUTH | CORE_TESTED |
+| SaaS | cargo descritivo + permissões granulares por colaborador | CONFIRMED_AUTH | CORE_TESTED |
+| SaaS | política de senha do colaborador | CONFIRMED_AUTH | CORE_TESTED |
+| SaaS | enforcement exato de cada permissão | UNKNOWN | TODO |
 | SaaS | multiunidade/organização interna exata | UNKNOWN | TODO |
 | SaaS | billing/assinatura/admin interno | UNKNOWN | TODO |
 | Edge cases | regras exatas de cancelamento/estorno | UNKNOWN | TODO |

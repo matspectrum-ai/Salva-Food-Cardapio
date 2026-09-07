@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/catalog"
+	"github.com/matspectrum-ai/salva-food/apps/api/internal/identity"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
 	db "github.com/matspectrum-ai/salva-food/apps/api/internal/platform/postgres/sqlc"
 )
@@ -457,3 +458,181 @@ func mapOrder(row db.Order, rows []db.OrderItem) *orders.Order {
 
 var _ catalog.Repository = (*Store)(nil)
 var _ orders.Repository = (*Store)(nil)
+
+func permissionStrings(input []identity.Permission) []string {
+	result := make([]string, len(input))
+	for i, permission := range input {
+		result[i] = string(permission)
+	}
+	return result
+}
+
+func mapIdentityUser(row db.AppUser) (identity.User, error) {
+	user, err := identity.NewUser(
+		formatUUID(row.ID), row.Name, row.Cpf, row.Email, row.Phone, row.PasswordHash,
+	)
+	if err != nil {
+		return identity.User{}, err
+	}
+	if row.ImageUrl.Valid {
+		user.ImageURL = row.ImageUrl.String
+	}
+	return user, nil
+}
+
+func mapIdentityMembership(row db.TenantMembership) (identity.Membership, error) {
+	permissions := make([]identity.Permission, len(row.Permissions))
+	for i, permission := range row.Permissions {
+		permissions[i] = identity.Permission(permission)
+	}
+	membership, err := identity.NewMembership(
+		formatUUID(row.TenantID), formatUUID(row.UserID), row.Title, permissions,
+	)
+	if err != nil {
+		return identity.Membership{}, err
+	}
+	if err := membership.SetStatus(identity.MembershipStatus(row.Status)); err != nil {
+		return identity.Membership{}, err
+	}
+	return membership, nil
+}
+
+func nullableText(value string) pgtype.Text {
+	if value == "" {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: value, Valid: true}
+}
+
+func (s *Store) CreateCollaborator(ctx context.Context, collaborator identity.Collaborator) error {
+	userID, err := parseUUID(collaborator.User.ID)
+	if err != nil {
+		return err
+	}
+	tenantID, err := parseUUID(collaborator.Membership.TenantID)
+	if err != nil {
+		return err
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := s.q.WithTx(tx)
+
+	_, err = q.CreateAppUser(ctx, db.CreateAppUserParams{
+		ID: userID, Name: collaborator.User.Name, Cpf: collaborator.User.CPF,
+		Email: collaborator.User.Email, Phone: collaborator.User.Phone,
+		ImageUrl:     nullableText(collaborator.User.ImageURL),
+		PasswordHash: collaborator.User.PasswordHash,
+	})
+	if pgConstraint(err, "23505", "") {
+		return identity.ErrUserAlreadyExists
+	}
+	if err != nil {
+		return err
+	}
+	_, err = q.CreateTenantMembership(ctx, db.CreateTenantMembershipParams{
+		TenantID: tenantID, UserID: userID, Title: collaborator.Membership.Title,
+		Status:      string(collaborator.Membership.Status),
+		Permissions: permissionStrings(collaborator.Membership.Permissions),
+	})
+	if pgConstraint(err, "23505", "tenant_memberships_pkey") {
+		return identity.ErrMembershipAlreadyExists
+	}
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (s *Store) FindUserByEmail(ctx context.Context, email string) (identity.User, bool, error) {
+	row, err := s.q.GetAppUserByEmail(ctx, email)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return identity.User{}, false, nil
+	}
+	if err != nil {
+		return identity.User{}, false, err
+	}
+	user, err := mapIdentityUser(row)
+	if err != nil {
+		return identity.User{}, false, err
+	}
+	return user, true, nil
+}
+
+func (s *Store) GetMembership(ctx context.Context, tenantIDValue, userIDValue string) (identity.Membership, bool, error) {
+	tenantID, err := parseUUID(tenantIDValue)
+	if err != nil {
+		return identity.Membership{}, false, err
+	}
+	userID, err := parseUUID(userIDValue)
+	if err != nil {
+		return identity.Membership{}, false, err
+	}
+	row, err := s.q.GetTenantMembership(ctx, db.GetTenantMembershipParams{TenantID: tenantID, UserID: userID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return identity.Membership{}, false, nil
+	}
+	if err != nil {
+		return identity.Membership{}, false, err
+	}
+	membership, err := mapIdentityMembership(row)
+	if err != nil {
+		return identity.Membership{}, false, err
+	}
+	return membership, true, nil
+}
+
+func (s *Store) ListCollaborators(ctx context.Context, tenantIDValue, search string) ([]identity.Collaborator, error) {
+	tenantID, err := parseUUID(tenantIDValue)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ListCollaborators(ctx, db.ListCollaboratorsParams{TenantID: tenantID, Search: search})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]identity.Collaborator, 0, len(rows))
+	for _, row := range rows {
+		user, err := mapIdentityUser(db.AppUser{
+			ID: row.ID, Name: row.Name, Cpf: row.Cpf, Email: row.Email,
+			Phone: row.Phone, ImageUrl: row.ImageUrl, PasswordHash: row.PasswordHash,
+		})
+		if err != nil {
+			return nil, err
+		}
+		membership, err := mapIdentityMembership(db.TenantMembership{
+			TenantID: row.TenantID, UserID: row.ID, Title: row.Title,
+			Status: row.Status, Permissions: row.Permissions,
+		})
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, identity.Collaborator{User: user, Membership: membership})
+	}
+	return result, nil
+}
+
+func (s *Store) SetMembershipStatus(ctx context.Context, tenantIDValue, userIDValue string, status identity.MembershipStatus) error {
+	if status != identity.MembershipActive && status != identity.MembershipInactive {
+		return identity.ErrInvalidStatus
+	}
+	tenantID, err := parseUUID(tenantIDValue)
+	if err != nil {
+		return err
+	}
+	userID, err := parseUUID(userIDValue)
+	if err != nil {
+		return err
+	}
+	_, err = s.q.SetTenantMembershipStatus(ctx, db.SetTenantMembershipStatusParams{
+		TenantID: tenantID, UserID: userID, Status: string(status),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return identity.ErrCollaboratorNotFound
+	}
+	return err
+}
+
+var _ identity.Repository = (*Store)(nil)

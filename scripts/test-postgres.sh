@@ -21,12 +21,13 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 
-migration="$ROOT_DIR/apps/api/db/migrations/000001_core.sql"
-sed '/-- +goose Down/,$d' "$migration" \
-  | podman exec -i "$NAME" psql -U postgres -p "$PORT" -v ON_ERROR_STOP=1 >/dev/null
+for migration in "$ROOT_DIR"/apps/api/db/migrations/*.sql; do
+  sed '/-- +goose Down/,$d' "$migration" \
+    | podman exec -i "$NAME" psql -U postgres -p "$PORT" -v ON_ERROR_STOP=1 >/dev/null
+done
 
 (
   cd "$ROOT_DIR/apps/api"
   TEST_DATABASE_URL="postgres://postgres:postgres@127.0.0.1:${PORT}/postgres?sslmode=disable" \
-    go test -count=1 -v ./internal/platform/postgres -run TestStoreIntegration
+    go test -count=1 -v ./internal/platform/postgres -run 'Test(Store|IdentityStore)Integration'
 )

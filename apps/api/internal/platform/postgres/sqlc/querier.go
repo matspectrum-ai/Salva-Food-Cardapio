@@ -11,6 +11,8 @@ import (
 )
 
 type Querier interface {
+	CreateAppUser(ctx context.Context, arg CreateAppUserParams) (AppUser, error)
+	CreateAuthSession(ctx context.Context, arg CreateAuthSessionParams) (AuthSession, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (CatalogCategory, error)
 	CreateEstablishment(ctx context.Context, arg CreateEstablishmentParams) (Establishment, error)
 	CreateItem(ctx context.Context, arg CreateItemParams) (CatalogItem, error)
@@ -19,15 +21,21 @@ type Querier interface {
 	CreateOrderItem(ctx context.Context, arg CreateOrderItemParams) (OrderItem, error)
 	CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) (OutboxEvent, error)
 	CreateTenant(ctx context.Context, arg CreateTenantParams) (Tenant, error)
+	CreateTenantMembership(ctx context.Context, arg CreateTenantMembershipParams) (TenantMembership, error)
 	DeleteOrderIdempotency(ctx context.Context, arg DeleteOrderIdempotencyParams) error
+	GetAppUserByEmail(ctx context.Context, lower string) (AppUser, error)
+	GetAppUserByID(ctx context.Context, id pgtype.UUID) (AppUser, error)
+	GetAuthSessionByTokenHash(ctx context.Context, tokenHash string) (AuthSession, error)
 	GetCategory(ctx context.Context, arg GetCategoryParams) (CatalogCategory, error)
 	GetEstablishment(ctx context.Context, arg GetEstablishmentParams) (Establishment, error)
 	GetItem(ctx context.Context, arg GetItemParams) (CatalogItem, error)
 	GetOrder(ctx context.Context, arg GetOrderParams) (Order, error)
 	GetOrderIdempotency(ctx context.Context, arg GetOrderIdempotencyParams) (OrderIdempotency, error)
 	GetTenant(ctx context.Context, id pgtype.UUID) (Tenant, error)
+	GetTenantMembership(ctx context.Context, arg GetTenantMembershipParams) (TenantMembership, error)
 	IncrementOutboxEventAttempts(ctx context.Context, id pgtype.UUID) error
 	ListCategories(ctx context.Context, tenantID pgtype.UUID) ([]CatalogCategory, error)
+	ListCollaborators(ctx context.Context, arg ListCollaboratorsParams) ([]ListCollaboratorsRow, error)
 	ListItems(ctx context.Context, tenantID pgtype.UUID) ([]CatalogItem, error)
 	ListItemsByCategory(ctx context.Context, arg ListItemsByCategoryParams) ([]CatalogItem, error)
 	ListOrderItems(ctx context.Context, arg ListOrderItemsParams) ([]OrderItem, error)
@@ -35,8 +43,10 @@ type Querier interface {
 	ListPendingOutboxEvents(ctx context.Context, limit int32) ([]OutboxEvent, error)
 	LockOrderForUpdate(ctx context.Context, arg LockOrderForUpdateParams) (Order, error)
 	MarkOutboxEventPublished(ctx context.Context, id pgtype.UUID) error
+	RevokeAuthSession(ctx context.Context, id pgtype.UUID) (AuthSession, error)
 	SetCategorySoldOut(ctx context.Context, arg SetCategorySoldOutParams) (CatalogCategory, error)
 	SetItemSoldOut(ctx context.Context, arg SetItemSoldOutParams) (CatalogItem, error)
+	SetTenantMembershipStatus(ctx context.Context, arg SetTenantMembershipStatusParams) (TenantMembership, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
 }
 

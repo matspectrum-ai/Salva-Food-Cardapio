@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/catalog"
+	"github.com/matspectrum-ai/salva-food/apps/api/internal/identity"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
 	db "github.com/matspectrum-ai/salva-food/apps/api/internal/platform/postgres/sqlc"
 )
@@ -18,6 +19,8 @@ const (
 	testCatA     = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 	testItemA    = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 	testOrderA   = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+	testUserA    = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+	testUserB    = "ffffffff-ffff-4fff-8fff-ffffffffffff"
 	fingerprintA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	fingerprintB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 )
@@ -112,5 +115,96 @@ func TestStoreIntegration(t *testing.T) {
 	ordersB, err := store.List(ctx, testTenantB)
 	if err != nil || len(ordersB) != 0 {
 		t.Fatalf("tenant B list: len=%d err=%v", len(ordersB), err)
+	}
+}
+
+func TestIdentityStoreIntegration(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if _, err := store.pool.Exec(ctx, `TRUNCATE auth_sessions, tenant_memberships, app_users, tenants CASCADE`); err != nil {
+		t.Fatal(err)
+	}
+
+	seed := func(idValue, name string) {
+		id, parseErr := parseUUID(idValue)
+		if parseErr != nil {
+			t.Fatal(parseErr)
+		}
+		if _, createErr := store.q.CreateTenant(ctx, db.CreateTenantParams{ID: id, Name: name}); createErr != nil {
+			t.Fatal(createErr)
+		}
+	}
+	seed(testTenantA, "Tenant A")
+	seed(testTenantB, "Tenant B")
+
+	user, err := identity.NewUser(
+		testUserA, "Maria Silva", "529.982.247-25", "maria@example.com",
+		"(93) 99999-9999", "test-hash",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	membership, err := identity.NewMembership(
+		testTenantA, testUserA, "Gerente",
+		[]identity.Permission{identity.PermissionPOS, identity.PermissionReports},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	collaborator := identity.Collaborator{User: user, Membership: membership}
+	if err := store.CreateCollaborator(ctx, collaborator); err != nil {
+		t.Fatal(err)
+	}
+
+	found, ok, err := store.FindUserByEmail(ctx, "MARIA@example.com")
+	if err != nil || !ok || found.ID != testUserA {
+		t.Fatalf("found=%+v ok=%v err=%v", found, ok, err)
+	}
+
+	items, err := store.ListCollaborators(ctx, testTenantA, "gerente")
+	if err != nil || len(items) != 1 || items[0].User.ID != testUserA {
+		t.Fatalf("items=%+v err=%v", items, err)
+	}
+	otherTenant, err := store.ListCollaborators(ctx, testTenantB, "")
+	if err != nil || len(otherTenant) != 0 {
+		t.Fatalf("tenant leak items=%+v err=%v", otherTenant, err)
+	}
+
+	if err := store.SetMembershipStatus(ctx, testTenantA, testUserA, identity.MembershipInactive); err != nil {
+		t.Fatal(err)
+	}
+	updated, ok, err := store.GetMembership(ctx, testTenantA, testUserA)
+	if err != nil || !ok || updated.Status != identity.MembershipInactive {
+		t.Fatalf("membership=%+v ok=%v err=%v", updated, ok, err)
+	}
+
+	duplicate, err := identity.NewUser(
+		testUserB, "Outra Pessoa", "168.995.350-09", "maria@example.com",
+		"(93) 98888-8888", "test-hash-2",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	duplicateMembership, err := identity.NewMembership(
+		testTenantB, testUserB, "Operador", []identity.Permission{identity.PermissionPOS},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateCollaborator(ctx, identity.Collaborator{
+		User: duplicate, Membership: duplicateMembership,
+	}); !errors.Is(err, identity.ErrUserAlreadyExists) {
+		t.Fatalf("duplicate identity err=%v", err)
 	}
 }

@@ -11,19 +11,22 @@ podman run --rm --network=none --user postgres \
     pg_ctl -D /tmp/pgdata -o "-k /tmp -c listen_addresses=" -w start >/dev/null
     trap "pg_ctl -D /tmp/pgdata -m fast -w stop >/dev/null 2>&1 || true" EXIT
 
-    migration=/src/db/migrations/000001_core.sql
-    sed "/-- +goose Down/,\$d" "$migration" \
-      | psql -h /tmp -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null
+    for migration in /src/db/migrations/*.sql; do
+      sed "/-- +goose Down/,\$d" "$migration" \
+        | psql -h /tmp -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null
+    done
 
-    count=$(psql -h /tmp -U postgres -d postgres -Atc \
-      "select count(*) from information_schema.tables where table_schema='"'"'public'"'"'")
-    test "$count" = "8"
+    for table in tenants catalog_items orders app_users tenant_memberships auth_sessions; do
+      test "$(psql -h /tmp -U postgres -d postgres -Atc "select to_regclass('"'"'public.$table'"'"') is not null")" = "t"
+    done
 
-    sed -n "/-- +goose Down/,\$p" "$migration" \
-      | psql -h /tmp -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null
+    for migration in $(ls -r /src/db/migrations/*.sql); do
+      sed -n "/-- +goose Down/,\$p" "$migration" \
+        | psql -h /tmp -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null
+    done
 
     remaining=$(psql -h /tmp -U postgres -d postgres -Atc \
       "select count(*) from information_schema.tables where table_schema='"'"'public'"'"'")
     test "$remaining" = "0"
-    echo "postgres migration up/down: OK"
+    echo "postgres migrations up/down: OK"
   '
