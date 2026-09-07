@@ -13,14 +13,20 @@ Legend:
 | Onboarding | cadastro inicial do estabelecimento | CONFIRMED_PUBLIC | TODO |
 | Onboarding | importar configuração/cardápio do iFood | CONFIRMED_PUBLIC | TODO |
 | Onboarding | configuração manual | CONFIRMED_PUBLIC | TODO |
-| Orders | Kanban de pedidos | CONFIRMED_PUBLIC | TODO |
+| Orders | Kanban de pedidos | CONFIRMED_AUTH | TODO |
 | Orders | análise -> produção -> pronto/entrega -> finalizado | CONFIRMED_PUBLIC | TODO |
-| Orders | busca/filtros por canal/tipo | CONFIRMED_PUBLIC | TODO |
+| Orders | busca/filtros por canal/tipo | CONFIRMED_AUTH | TODO |
+| Orders | pedidos agendados: filtros + abas Pendentes/Aceitos | CONFIRMED_AUTH | TODO |
 | Orders | editar pedido existente via PDV | CONFIRMED_PUBLIC | TODO |
 | Orders | reimprimir comanda | CONFIRMED_PUBLIC | TODO |
 | Orders | cancelar/finalizar pedido | CONFIRMED_PUBLIC | TODO |
 | Catalog | cardápio digital | CONFIRMED_PUBLIC | TODO |
-| Catalog | categorias/produtos/complementos/combos | CONFIRMED_PUBLIC | TODO |
+| Catalog | categorias e produtos no gestor | CONFIRMED_AUTH | TODO |
+| Catalog | complementos/combos | CONFIRMED_PUBLIC | TODO |
+| Catalog | ordenação manual e esgotamento de categoria/item | CONFIRMED_AUTH | TODO |
+| Catalog | edição em massa (módulo) | CONFIRMED_AUTH | TODO |
+| Catalog | importação inteligente (módulo) | CONFIRMED_AUTH | TODO |
+| Catalog | importação de cardápio iFood (módulo) | CONFIRMED_AUTH | TODO |
 | Catalog | QR Code | CONFIRMED_PUBLIC | TODO |
 | Catalog | etiquetas/restrições alimentares | CONFIRMED_PUBLIC | TODO |
 | Catalog | produtos em destaque / sugestão / upsell | CONFIRMED_PUBLIC | TODO |
