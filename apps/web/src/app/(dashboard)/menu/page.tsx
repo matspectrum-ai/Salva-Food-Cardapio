@@ -1,3 +1,4 @@
+import { MenuCreatePanel } from "@/components/menu-create-panel";
 import { getCategories, getItems } from "@/lib/api";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -14,6 +15,9 @@ export default async function MenuPage() {
         </div>
         <p className="text-sm text-zinc-500">{categories.length} categorias · {items.length} itens</p>
       </div>
+
+      <MenuCreatePanel categories={categories} />
+
       <div className="space-y-5">
         {categories.map((category) => {
           const categoryItems = items.filter((item) => item.category_id === category.id);
@@ -44,7 +48,7 @@ export default async function MenuPage() {
             </article>
           );
         })}
-        {!categories.length ? <div className="card p-8 text-center text-sm text-zinc-500">O cardápio ainda não possui categorias.</div> : null}
+        {!categories.length ? <div className="card p-8 text-center text-sm text-zinc-500">Crie a primeira categoria para começar o cardápio.</div> : null}
       </div>
     </section>
   );
