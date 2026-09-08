@@ -11,7 +11,7 @@ Legend:
 
 | Domain | Capability | Evidence | Build |
 |---|---|---:|---:|
-| Onboarding | cadastro inicial do estabelecimento | CONFIRMED_PUBLIC | TODO |
+| Onboarding | cadastro inicial do estabelecimento | CONFIRMED_PUBLIC | CORE_TESTED |
 | Onboarding | importar configuração/cardápio do iFood | CONFIRMED_AUTH | TODO |
 | Onboarding | configuração manual | CONFIRMED_PUBLIC | TODO |
 | Orders | Kanban de pedidos | CONFIRMED_AUTH | TODO |

@@ -29,5 +29,5 @@ done
 (
   cd "$ROOT_DIR/apps/api"
   TEST_DATABASE_URL="postgres://postgres:postgres@127.0.0.1:${PORT}/postgres?sslmode=disable" \
-    go test -count=1 -v ./internal/platform/postgres -run 'Test(Store|IdentityStore|AuthSession)Integration'
+    go test -count=1 -v ./internal/platform/postgres -run 'Test(Store|IdentityStore|AuthSession|OnboardingStore)Integration'
 )
