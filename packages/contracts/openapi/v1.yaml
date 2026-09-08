@@ -3,40 +3,31 @@ info:
   title: Salva Food API
   version: 0.1.0
 servers:
-  - url: /
+- url: /
 security:
-  - BearerAuth: []
+- BearerAuth: []
 paths:
   /api/v1/catalog/categories:
     get:
       summary: List catalog categories
-      parameters:
       responses:
-    Unauthorized:
-      description: Missing, invalid, expired, or revoked session
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    Forbidden:
-      description: Authenticated principal lacks access or required permission
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
         '200':
           description: Categories ordered by sort_order
           content:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
                   data:
                     type: array
                     items:
                       $ref: '#/components/schemas/Category'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
       summary: Create a catalog category
-      parameters:
       requestBody:
         required: true
         content:
@@ -56,11 +47,11 @@ paths:
     get:
       summary: List catalog items
       parameters:
-        - in: query
-          name: category_id
-          schema:
-            type: string
-            format: uuid
+      - in: query
+        name: category_id
+        schema:
+          type: string
+          format: uuid
       responses:
         '200':
           description: Items ordered by sort_order
@@ -68,7 +59,8 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
                   data:
                     type: array
@@ -76,7 +68,6 @@ paths:
                       $ref: '#/components/schemas/Item'
     post:
       summary: Create a catalog item
-      parameters:
       requestBody:
         required: true
         content:
@@ -97,7 +88,6 @@ paths:
   /api/v1/orders:
     get:
       summary: List tenant orders
-      parameters:
       responses:
         '200':
           description: Tenant orders
@@ -105,7 +95,8 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
                   data:
                     type: array
@@ -114,7 +105,7 @@ paths:
     post:
       summary: Create an order
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -128,7 +119,8 @@ paths:
             Idempotent-Replay:
               schema:
                 type: string
-                enum: ['true']
+                enum:
+                - 'true'
           content:
             application/json:
               schema:
@@ -143,12 +135,12 @@ paths:
     post:
       summary: Transition an order state
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -156,7 +148,8 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [status]
+              required:
+              - status
               properties:
                 status:
                   $ref: '#/components/schemas/OrderStatus'
@@ -179,22 +172,29 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/LoginRequest' }
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
           description: Authenticated session
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/LoginResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /api/v1/auth/logout:
     post:
       summary: Revoke the current session
       responses:
-        '204': { description: Session revoked }
-        '401': { $ref: '#/components/responses/Unauthorized' }
+        '204':
+          description: Session revoked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/v1/me:
     get:
       summary: Get the current authenticated principal
@@ -203,15 +203,18 @@ paths:
           description: Current principal
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Principal' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
+              schema:
+                $ref: '#/components/schemas/Principal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/v1/collaborators:
     get:
       summary: List tenant collaborators
       parameters:
-        - in: query
-          name: search
-          schema: { type: string }
+      - in: query
+        name: search
+        schema:
+          type: string
       responses:
         '200':
           description: Collaborators
@@ -219,36 +222,46 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
                   data:
                     type: array
-                    items: { $ref: '#/components/schemas/Collaborator' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+                    items:
+                      $ref: '#/components/schemas/Collaborator'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       summary: Create a collaborator
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CreateCollaboratorRequest' }
+            schema:
+              $ref: '#/components/schemas/CreateCollaboratorRequest'
       responses:
         '201':
           description: Collaborator created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Collaborator' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
+              schema:
+                $ref: '#/components/schemas/Collaborator'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /api/v1/collaborators/{id}/status:
     patch:
       summary: Activate or deactivate a collaborator membership
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -256,14 +269,41 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [status]
+              required:
+              - status
               properties:
-                status: { $ref: '#/components/schemas/MembershipStatus' }
+                status:
+                  $ref: '#/components/schemas/MembershipStatus'
       responses:
-        '204': { description: Membership status updated }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        '204':
+          description: Membership status updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/onboarding:
+    post:
+      security: []
+      summary: Create the first tenant, establishment and owner atomically
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingRequest'
+      responses:
+        '201':
+          description: Tenant, establishment and owner created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
 components:
   securitySchemes:
     BearerAuth:
@@ -297,194 +337,498 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing, invalid, expired, or revoked session
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Authenticated principal lacks access or required permission
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     Category:
       type: object
-      required: [tenant_id, id, name, sort_order, sold_out]
+      required:
+      - tenant_id
+      - id
+      - name
+      - sort_order
+      - sold_out
       properties:
-        tenant_id: { type: string }
-        id: { type: string }
-        name: { type: string }
-        sort_order: { type: integer, minimum: 0 }
-        sold_out: { type: boolean }
+        tenant_id:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        sort_order:
+          type: integer
+          minimum: 0
+        sold_out:
+          type: boolean
     CreateCategoryRequest:
       type: object
       additionalProperties: false
-      required: [name, sort_order]
+      required:
+      - name
+      - sort_order
       properties:
-        name: { type: string, minLength: 1 }
-        sort_order: { type: integer, minimum: 0 }
+        name:
+          type: string
+          minLength: 1
+        sort_order:
+          type: integer
+          minimum: 0
     Item:
       type: object
-      required: [tenant_id, id, category_id, name, price_cents, sort_order, sold_out, sold_by_weight]
+      required:
+      - tenant_id
+      - id
+      - category_id
+      - name
+      - price_cents
+      - sort_order
+      - sold_out
+      - sold_by_weight
       properties:
-        tenant_id: { type: string }
-        id: { type: string }
-        category_id: { type: string }
-        name: { type: string }
-        price_cents: { type: integer, format: int64, minimum: 0 }
-        sort_order: { type: integer, minimum: 0 }
-        sold_out: { type: boolean }
-        sold_by_weight: { type: boolean }
+        tenant_id:
+          type: string
+        id:
+          type: string
+        category_id:
+          type: string
+        name:
+          type: string
+        price_cents:
+          type: integer
+          format: int64
+          minimum: 0
+        sort_order:
+          type: integer
+          minimum: 0
+        sold_out:
+          type: boolean
+        sold_by_weight:
+          type: boolean
     CreateItemRequest:
       type: object
       additionalProperties: false
-      required: [category_id, name, price_cents, sort_order]
+      required:
+      - category_id
+      - name
+      - price_cents
+      - sort_order
       properties:
-        category_id: { type: string }
-        name: { type: string, minLength: 1 }
-        price_cents: { type: integer, format: int64, minimum: 0 }
-        sort_order: { type: integer, minimum: 0 }
-        sold_by_weight: { type: boolean, default: false }
+        category_id:
+          type: string
+        name:
+          type: string
+          minLength: 1
+        price_cents:
+          type: integer
+          format: int64
+          minimum: 0
+        sort_order:
+          type: integer
+          minimum: 0
+        sold_by_weight:
+          type: boolean
+          default: false
     OrderStatus:
       type: string
-      enum: [ANALYSIS, PRODUCTION, READY, FINALIZED, CANCELLED]
+      enum:
+      - ANALYSIS
+      - PRODUCTION
+      - READY
+      - FINALIZED
+      - CANCELLED
     OrderLine:
       type: object
-      required: [item_id, name, quantity, unit_price_cents]
+      required:
+      - item_id
+      - name
+      - quantity
+      - unit_price_cents
       properties:
-        item_id: { type: string }
-        name: { type: string }
-        quantity: { type: integer, format: int64, minimum: 1 }
-        unit_price_cents: { type: integer, format: int64, minimum: 0 }
+        item_id:
+          type: string
+        name:
+          type: string
+        quantity:
+          type: integer
+          format: int64
+          minimum: 1
+        unit_price_cents:
+          type: integer
+          format: int64
+          minimum: 0
     Order:
       type: object
-      required: [tenant_id, id, source, status, items, total_cents]
+      required:
+      - tenant_id
+      - id
+      - source
+      - status
+      - items
+      - total_cents
       properties:
-        tenant_id: { type: string }
-        id: { type: string }
-        source: { type: string }
-        status: { $ref: '#/components/schemas/OrderStatus' }
+        tenant_id:
+          type: string
+        id:
+          type: string
+        source:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
         items:
           type: array
           minItems: 1
-          items: { $ref: '#/components/schemas/OrderLine' }
-        total_cents: { type: integer, format: int64, minimum: 0 }
+          items:
+            $ref: '#/components/schemas/OrderLine'
+        total_cents:
+          type: integer
+          format: int64
+          minimum: 0
     CreateOrderRequest:
       type: object
       additionalProperties: false
-      required: [source, items]
+      required:
+      - source
+      - items
       properties:
-        source: { type: string, minLength: 1 }
+        source:
+          type: string
+          minLength: 1
         items:
           type: array
           minItems: 1
           items:
             type: object
             additionalProperties: false
-            required: [item_id, quantity]
+            required:
+            - item_id
+            - quantity
             properties:
-              item_id: { type: string }
-              quantity: { type: integer, format: int64, minimum: 1 }
+              item_id:
+                type: string
+              quantity:
+                type: integer
+                format: int64
+                minimum: 1
     MembershipStatus:
       type: string
-      enum: [ACTIVE, INACTIVE]
+      enum:
+      - ACTIVE
+      - INACTIVE
     Permission:
       type: string
       enum:
-        - reports
-        - virtual_assistant
-        - sales_growth
-        - subscription
-        - settings
-        - pos
-        - establishment
-        - coupon
-        - satisfaction
-        - menu_items
-        - delivery_regions
-        - buy_more
-        - cashback
-        - sales_recovery
-        - hall_waiter
-        - menu_edit
-        - cash_open
-        - ready_order_edit
-        - fiscal_issue
-        - nfce_issue
-        - finance
-        - purchasing
-        - inventory
-        - dashboard
-        - online_payment
+      - reports
+      - virtual_assistant
+      - sales_growth
+      - subscription
+      - settings
+      - pos
+      - establishment
+      - coupon
+      - satisfaction
+      - menu_items
+      - delivery_regions
+      - buy_more
+      - cashback
+      - sales_recovery
+      - hall_waiter
+      - menu_edit
+      - cash_open
+      - ready_order_edit
+      - fiscal_issue
+      - nfce_issue
+      - finance
+      - purchasing
+      - inventory
+      - dashboard
+      - online_payment
     Membership:
       type: object
-      required: [tenant_id, user_id, title, status, permissions]
+      required:
+      - tenant_id
+      - user_id
+      - title
+      - status
+      - permissions
       properties:
-        tenant_id: { type: string, format: uuid }
-        user_id: { type: string, format: uuid }
-        title: { type: string }
-        status: { $ref: '#/components/schemas/MembershipStatus' }
+        tenant_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/MembershipStatus'
         permissions:
           type: array
-          items: { $ref: '#/components/schemas/Permission' }
+          items:
+            $ref: '#/components/schemas/Permission'
     User:
       type: object
-      required: [id, name, cpf, email, phone]
+      required:
+      - id
+      - name
+      - cpf
+      - email
+      - phone
       properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        cpf: { type: string }
-        email: { type: string, format: email }
-        phone: { type: string }
-        image_url: { type: string }
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        cpf:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        image_url:
+          type: string
     Principal:
       type: object
-      required: [user, membership]
+      required:
+      - user
+      - membership
       properties:
-        user: { $ref: '#/components/schemas/User' }
-        membership: { $ref: '#/components/schemas/Membership' }
+        user:
+          $ref: '#/components/schemas/User'
+        membership:
+          $ref: '#/components/schemas/Membership'
     LoginRequest:
       type: object
       additionalProperties: false
-      required: [email, password]
+      required:
+      - email
+      - password
       properties:
-        email: { type: string, format: email }
-        password: { type: string, minLength: 1 }
-        tenant_id: { type: string, format: uuid }
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+        tenant_id:
+          type: string
+          format: uuid
     LoginResponse:
       type: object
-      required: [token, expires_at, principal]
+      required:
+      - token
+      - expires_at
+      - principal
       properties:
-        token: { type: string }
-        expires_at: { type: string, format: date-time }
-        principal: { $ref: '#/components/schemas/Principal' }
+        token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        principal:
+          $ref: '#/components/schemas/Principal'
     Collaborator:
       type: object
-      required: [id, name, email, phone, title, status, permissions]
+      required:
+      - id
+      - name
+      - email
+      - phone
+      - title
+      - status
+      - permissions
       properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        email: { type: string, format: email }
-        phone: { type: string }
-        image_url: { type: string }
-        title: { type: string }
-        status: { $ref: '#/components/schemas/MembershipStatus' }
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        image_url:
+          type: string
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/MembershipStatus'
         permissions:
           type: array
-          items: { $ref: '#/components/schemas/Permission' }
+          items:
+            $ref: '#/components/schemas/Permission'
     CreateCollaboratorRequest:
       type: object
       additionalProperties: false
-      required: [name, cpf, email, password, phone, title, permissions]
+      required:
+      - name
+      - cpf
+      - email
+      - password
+      - phone
+      - title
+      - permissions
       properties:
-        name: { type: string, minLength: 1 }
-        cpf: { type: string }
-        email: { type: string, format: email }
-        password: { type: string, minLength: 8 }
-        phone: { type: string, minLength: 1 }
-        title: { type: string, minLength: 1 }
-        image_url: { type: string }
+        name:
+          type: string
+          minLength: 1
+        cpf:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        phone:
+          type: string
+          minLength: 1
+        title:
+          type: string
+          minLength: 1
+        image_url:
+          type: string
         permissions:
           type: array
           minItems: 1
-          items: { $ref: '#/components/schemas/Permission' }
+          items:
+            $ref: '#/components/schemas/Permission'
     ErrorResponse:
       type: object
-      required: [error]
+      required:
+      - error
       properties:
         error:
           type: object
-          required: [message]
+          required:
+          - message
           properties:
-            message: { type: string }
+            message:
+              type: string
+    OnboardingOwnerRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - cpf
+      - email
+      - phone
+      - password
+      properties:
+        name:
+          type: string
+          minLength: 1
+        cpf:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 8
+    OnboardingRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - tenant_name
+      - establishment_name
+      - timezone
+      - owner
+      properties:
+        tenant_name:
+          type: string
+          minLength: 1
+        establishment_name:
+          type: string
+          minLength: 1
+        timezone:
+          type: string
+          minLength: 1
+        owner:
+          $ref: '#/components/schemas/OnboardingOwnerRequest'
+    Tenant:
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    Establishment:
+      type: object
+      required:
+      - id
+      - tenant_id
+      - name
+      - timezone
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        timezone:
+          type: string
+    OnboardingOwner:
+      type: object
+      required:
+      - id
+      - name
+      - email
+      - phone
+      - title
+      - status
+      - permissions
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/MembershipStatus'
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+    OnboardingResponse:
+      type: object
+      required:
+      - tenant
+      - establishment
+      - owner
+      properties:
+        tenant:
+          $ref: '#/components/schemas/Tenant'
+        establishment:
+          $ref: '#/components/schemas/Establishment'
+        owner:
+          $ref: '#/components/schemas/OnboardingOwner'

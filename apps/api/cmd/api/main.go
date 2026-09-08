@@ -14,6 +14,7 @@ import (
 
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/catalog"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/identity"
+	"github.com/matspectrum-ai/salva-food/apps/api/internal/onboarding"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/platform/httpapi"
 	postgresstore "github.com/matspectrum-ai/salva-food/apps/api/internal/platform/postgres"
@@ -30,6 +31,7 @@ func main() {
 	var orderRepo orders.Repository
 	var identityRepo identity.Repository
 	var authRepo identity.AuthRepository
+	var onboardingRepo onboarding.Repository
 	var closeStore func()
 
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
@@ -41,6 +43,7 @@ func main() {
 		orderRepo = store
 		identityRepo = store
 		authRepo = store
+		onboardingRepo = store
 		closeStore = store.Close
 		log.Printf("storage backend: postgres")
 	} else {
@@ -49,6 +52,7 @@ func main() {
 		identityStore := identity.NewMemoryStore()
 		identityRepo = identityStore
 		authRepo = identityStore
+		onboardingRepo = onboarding.NewMemoryRepository(identityStore)
 		closeStore = func() {}
 		log.Printf("storage backend: memory")
 	}
@@ -56,10 +60,11 @@ func main() {
 
 	passwords := identity.NewBcryptPasswordManager(0)
 	identityService := identity.NewService(identityRepo, passwords, uuid.NewString)
+	onboardingService := onboarding.NewService(onboardingRepo, passwords, uuid.NewString)
 	authService := identity.NewAuthService(
 		authRepo, passwords, newOpaqueToken, uuid.NewString, time.Now, sessionTTL(),
 	)
-	api := httpapi.NewAuthenticated(catalogRepo, orderRepo, identityService, authService, uuid.NewString)
+	api := httpapi.NewAuthenticatedWithOnboarding(catalogRepo, orderRepo, identityService, authService, onboardingService, uuid.NewString)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.Handle("/", api.Handler())

@@ -65,6 +65,15 @@ var validPermissions = map[Permission]struct{}{
 	PermissionOnlinePayment: {},
 }
 
+func AllPermissions() []Permission {
+	result := make([]Permission, 0, len(validPermissions))
+	for permission := range validPermissions {
+		result = append(result, permission)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+	return result
+}
+
 func NormalizePermissionSet(input []Permission) ([]Permission, error) {
 	if len(input) == 0 {
 		return nil, ErrPermissionsRequired

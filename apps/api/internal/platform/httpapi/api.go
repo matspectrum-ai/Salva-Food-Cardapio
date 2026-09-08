@@ -9,19 +9,21 @@ import (
 
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/catalog"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/identity"
+	"github.com/matspectrum-ai/salva-food/apps/api/internal/onboarding"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
 )
 
 type IDGenerator func() string
 
 type API struct {
-	catalog         catalog.Repository
-	orders          orders.Repository
-	orderService    *orders.Service
-	identityService *identity.Service
-	authService     *identity.AuthService
-	strictAuth      bool
-	newID           IDGenerator
+	catalog           catalog.Repository
+	orders            orders.Repository
+	orderService      *orders.Service
+	identityService   *identity.Service
+	authService       *identity.AuthService
+	onboardingService *onboarding.Service
+	strictAuth        bool
+	newID             IDGenerator
 }
 
 type catalogReader struct {
@@ -53,18 +55,22 @@ func (r catalogReader) LookupOrderProduct(ctx context.Context, tenantID, itemID 
 }
 
 func New(catalogStore catalog.Repository, orderStore orders.Repository, newID IDGenerator) *API {
-	return newAPI(catalogStore, orderStore, nil, nil, false, newID)
+	return newAPI(catalogStore, orderStore, nil, nil, nil, false, newID)
 }
 
 func NewAuthenticated(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, newID IDGenerator) *API {
-	return newAPI(catalogStore, orderStore, identityService, authService, true, newID)
+	return newAPI(catalogStore, orderStore, identityService, authService, nil, true, newID)
 }
 
-func newAPI(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, strictAuth bool, newID IDGenerator) *API {
+func NewAuthenticatedWithOnboarding(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, onboardingService *onboarding.Service, newID IDGenerator) *API {
+	return newAPI(catalogStore, orderStore, identityService, authService, onboardingService, true, newID)
+}
+
+func newAPI(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, onboardingService *onboarding.Service, strictAuth bool, newID IDGenerator) *API {
 	return &API{
 		catalog: catalogStore, orders: orderStore,
 		orderService:    orders.NewService(orderStore, catalogReader{store: catalogStore}, orders.IDGenerator(newID)),
-		identityService: identityService, authService: authService, strictAuth: strictAuth, newID: newID,
+		identityService: identityService, authService: authService, onboardingService: onboardingService, strictAuth: strictAuth, newID: newID,
 	}
 }
 func (a *API) Handler() http.Handler {
@@ -76,6 +82,9 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/orders", a.createOrder)
 	mux.HandleFunc("GET /api/v1/orders", a.listOrders)
 	mux.HandleFunc("POST /api/v1/orders/{id}/transitions", a.transitionOrder)
+	if a.onboardingService != nil {
+		a.registerOnboardingRoutes(mux)
+	}
 	if a.authService != nil && a.identityService != nil {
 		a.registerIdentityRoutes(mux)
 	}
