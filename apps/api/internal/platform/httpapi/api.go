@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/catalog"
+	"github.com/matspectrum-ai/salva-food/apps/api/internal/customers"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/identity"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/onboarding"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
@@ -24,6 +25,7 @@ type API struct {
 	onboardingService *onboarding.Service
 	strictAuth        bool
 	newID             IDGenerator
+	customers         customers.Repository
 }
 
 type catalogReader struct {
@@ -62,14 +64,22 @@ func NewAuthenticated(catalogStore catalog.Repository, orderStore orders.Reposit
 	return newAPI(catalogStore, orderStore, identityService, authService, nil, true, newID)
 }
 
-func NewAuthenticatedWithOnboarding(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, onboardingService *onboarding.Service, newID IDGenerator) *API {
-	return newAPI(catalogStore, orderStore, identityService, authService, onboardingService, true, newID)
+func NewAuthenticatedWithOnboarding(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, onboardingService *onboarding.Service, newID IDGenerator, customerRepos ...customers.Repository) *API {
+	return newAPI(catalogStore, orderStore, identityService, authService, onboardingService, true, newID, customerRepos...)
 }
 
-func newAPI(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, onboardingService *onboarding.Service, strictAuth bool, newID IDGenerator) *API {
+func newAPI(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, onboardingService *onboarding.Service, strictAuth bool, newID IDGenerator, customerRepos ...customers.Repository) *API {
+	var customerRepo customers.Repository
+	if len(customerRepos) > 0 {
+		customerRepo = customerRepos[0]
+	}
+	var customerReader orders.CustomerReader
+	if customerRepo != nil {
+		customerReader = customerRepo
+	}
 	return &API{
-		catalog: catalogStore, orders: orderStore,
-		orderService:    orders.NewService(orderStore, catalogReader{store: catalogStore}, orders.IDGenerator(newID)),
+		catalog: catalogStore, orders: orderStore, customers: customerRepo,
+		orderService:    orders.NewService(orderStore, catalogReader{store: catalogStore}, orders.IDGenerator(newID), customerReader),
 		identityService: identityService, authService: authService, onboardingService: onboardingService, strictAuth: strictAuth, newID: newID,
 	}
 }
@@ -82,6 +92,12 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/orders", a.createOrder)
 	mux.HandleFunc("GET /api/v1/orders", a.listOrders)
 	mux.HandleFunc("POST /api/v1/orders/{id}/transitions", a.transitionOrder)
+	if a.customers != nil {
+		mux.HandleFunc("POST /api/v1/customers", a.createCustomer)
+		mux.HandleFunc("GET /api/v1/customers", a.listCustomers)
+		mux.HandleFunc("POST /api/v1/customers/{id}/addresses", a.createAddress)
+		mux.HandleFunc("GET /api/v1/customers/{id}/addresses", a.listAddresses)
+	}
 	if a.onboardingService != nil {
 		a.registerOnboardingRoutes(mux)
 	}
@@ -244,6 +260,105 @@ func (a *API) transitionOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, order)
+}
+
+type createCustomerRequest struct {
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+	Email string `json:"email"`
+}
+
+func (a *API) createCustomer(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := a.tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	var req createCustomerRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	c, err := customers.NewCustomer(tenantID, a.newID(), req.Name, req.Phone, req.Email)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := a.customers.CreateCustomer(r.Context(), c); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, customers.ErrAlreadyExists) {
+			status = http.StatusConflict
+		}
+		writeError(w, status, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, c)
+}
+
+func (a *API) listCustomers(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := a.tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	result, err := a.customers.ListCustomers(r.Context(), tenantID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": result})
+}
+
+type createAddressRequest struct {
+	Label        string `json:"label"`
+	Street       string `json:"street"`
+	Number       string `json:"number"`
+	Complement   string `json:"complement"`
+	Neighborhood string `json:"neighborhood"`
+	City         string `json:"city"`
+	State        string `json:"state"`
+	PostalCode   string `json:"postal_code"`
+	Reference    string `json:"reference"`
+}
+
+func (a *API) createAddress(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := a.tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	var req createAddressRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	aid := r.PathValue("id")
+	address, err := customers.NewAddress(tenantID, a.newID(), aid, req.Street, req.Number, req.Neighborhood, req.City, req.State, req.PostalCode)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	address.Label, address.Complement, address.Reference = req.Label, req.Complement, req.Reference
+	if err := a.customers.CreateAddress(r.Context(), address); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, customers.ErrCustomerNotFound) {
+			status = http.StatusNotFound
+		}
+		if errors.Is(err, customers.ErrAlreadyExists) {
+			status = http.StatusConflict
+		}
+		writeError(w, status, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, address)
+}
+
+func (a *API) listAddresses(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := a.tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	result, err := a.customers.ListAddresses(r.Context(), tenantID, r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": result})
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {

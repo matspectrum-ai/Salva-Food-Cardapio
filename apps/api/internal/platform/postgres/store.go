@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -285,9 +286,39 @@ func (s *Store) Create(ctx context.Context, order *orders.Order, key, fingerprin
 		return nil, false, err
 	}
 
+	var customerID, addressID pgtype.UUID
+	var customerName, customerPhone, customerEmail pgtype.Text
+	var addressSnapshot []byte
+	if order.Customer != nil {
+		customerID, err = parseUUID(order.Customer.ID)
+		if err != nil {
+			return nil, false, err
+		}
+		customerName = nullableText(order.Customer.Name)
+		customerPhone = nullableText(order.Customer.Phone)
+		customerEmail = nullableText(order.Customer.Email)
+	}
+	if order.Address != nil {
+		addressID, err = parseUUID(order.Address.ID)
+		if err != nil {
+			return nil, false, err
+		}
+		addressSnapshot, err = json.Marshal(order.Address)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+	scheduledAt := pgtype.Timestamptz{}
+	if order.ScheduledAt != nil {
+		scheduledAt = pgtype.Timestamptz{Time: *order.ScheduledAt, Valid: true}
+	}
 	_, err = q.CreateOrder(ctx, db.CreateOrderParams{
 		ID: orderID, TenantID: tenantID, Source: order.Source,
 		Status: string(order.Status), TotalCents: order.TotalCents,
+		CustomerID: customerID, CustomerNameSnapshot: customerName,
+		CustomerPhoneSnapshot: customerPhone, CustomerEmailSnapshot: customerEmail,
+		AddressID: addressID, AddressSnapshot: addressSnapshot,
+		FulfillmentType: string(order.Fulfillment), ScheduledAt: scheduledAt, Notes: order.Notes,
 	})
 	if pgConstraint(err, "23505", "orders_pkey") {
 		return nil, false, orders.ErrOrderAlreadyExists
@@ -446,14 +477,25 @@ func mapOrder(row db.Order, rows []db.OrderItem) *orders.Order {
 			Quantity: line.Quantity, UnitPriceCents: line.UnitPriceCents,
 		})
 	}
-	return &orders.Order{
-		TenantID:   formatUUID(row.TenantID),
-		ID:         formatUUID(row.ID),
-		Source:     row.Source,
-		Status:     orders.Status(row.Status),
-		Items:      items,
-		TotalCents: row.TotalCents,
+	order := &orders.Order{
+		TenantID: formatUUID(row.TenantID), ID: formatUUID(row.ID),
+		Source: row.Source, Status: orders.Status(row.Status), Items: items,
+		TotalCents: row.TotalCents, Fulfillment: orders.FulfillmentType(row.FulfillmentType), Notes: row.Notes,
 	}
+	if row.CustomerID.Valid {
+		order.Customer = &orders.CustomerSnapshot{ID: formatUUID(row.CustomerID), Name: row.CustomerNameSnapshot.String, Phone: row.CustomerPhoneSnapshot.String, Email: row.CustomerEmailSnapshot.String}
+	}
+	if row.AddressID.Valid {
+		order.Address = &orders.AddressSnapshot{ID: formatUUID(row.AddressID)}
+		if len(row.AddressSnapshot) > 0 {
+			_ = json.Unmarshal(row.AddressSnapshot, order.Address)
+		}
+	}
+	if row.ScheduledAt.Valid {
+		t := row.ScheduledAt.Time
+		order.ScheduledAt = &t
+	}
+	return order
 }
 
 var _ catalog.Repository = (*Store)(nil)
