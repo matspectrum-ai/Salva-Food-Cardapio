@@ -85,6 +85,86 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/customers:
+    get:
+      summary: List tenant customers
+      responses:
+        '200':
+          description: Customers
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Customer'
+    post:
+      summary: Create a customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerRequest'
+      responses:
+        '201':
+          description: Customer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/customers/{id}/addresses:
+    get:
+      summary: List customer addresses
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Customer addresses
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Address'
+    post:
+      summary: Create an address for a customer
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAddressRequest'
+      responses:
+        '201':
+          description: Address created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /api/v1/orders:
     get:
       summary: List tenant orders
@@ -493,6 +573,81 @@ components:
           type: integer
           format: int64
           minimum: 0
+        customer:
+          $ref: '#/components/schemas/CustomerSnapshot'
+        address:
+          $ref: '#/components/schemas/AddressSnapshot'
+        fulfillment_type:
+          $ref: '#/components/schemas/FulfillmentType'
+        scheduled_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
+    FulfillmentType:
+      type: string
+      enum: [DELIVERY, PICKUP, DINE_IN]
+    CustomerSnapshot:
+      type: object
+      required: [id, name, phone]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        phone: {type: string}
+        email: {type: string}
+    AddressSnapshot:
+      type: object
+      required: [id, street, number, neighborhood, city, state, postal_code]
+      properties:
+        id: {type: string}
+        label: {type: string}
+        street: {type: string}
+        number: {type: string}
+        complement: {type: string}
+        neighborhood: {type: string}
+        city: {type: string}
+        state: {type: string}
+        postal_code: {type: string}
+        reference: {type: string}
+    Customer:
+      type: object
+      required: [tenant_id, id, name, phone]
+      properties:
+        tenant_id: {type: string}
+        id: {type: string}
+        name: {type: string}
+        phone: {type: string}
+        email: {type: string}
+    CreateCustomerRequest:
+      type: object
+      additionalProperties: false
+      required: [name, phone]
+      properties:
+        name: {type: string, minLength: 1}
+        phone: {type: string, minLength: 1}
+        email: {type: string}
+    Address:
+      allOf:
+      - $ref: '#/components/schemas/AddressSnapshot'
+      - type: object
+        required: [tenant_id, customer_id]
+        properties:
+          tenant_id: {type: string}
+          customer_id: {type: string}
+    CreateAddressRequest:
+      type: object
+      additionalProperties: false
+      required: [street, number, neighborhood, city, state, postal_code]
+      properties:
+        label: {type: string}
+        street: {type: string, minLength: 1}
+        number: {type: string, minLength: 1}
+        complement: {type: string}
+        neighborhood: {type: string, minLength: 1}
+        city: {type: string, minLength: 1}
+        state: {type: string, minLength: 1}
+        postal_code: {type: string, minLength: 1}
+        reference: {type: string}
     CreateOrderRequest:
       type: object
       additionalProperties: false
@@ -509,16 +664,19 @@ components:
           items:
             type: object
             additionalProperties: false
-            required:
-            - item_id
-            - quantity
+            required: [item_id, quantity]
             properties:
-              item_id:
-                type: string
-              quantity:
-                type: integer
-                format: int64
-                minimum: 1
+              item_id: {type: string}
+              quantity: {type: integer, format: int64, minimum: 1}
+        customer_id: {type: string}
+        address_id: {type: string}
+        fulfillment_type:
+          $ref: '#/components/schemas/FulfillmentType'
+        scheduled_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
     MembershipStatus:
       type: string
       enum:

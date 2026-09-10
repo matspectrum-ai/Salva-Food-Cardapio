@@ -4,17 +4,19 @@ import (
 	"errors"
 	"math"
 	"strings"
+	"time"
 )
 
 var (
-	ErrTenantRequired    = errors.New("tenant id is required")
-	ErrIDRequired        = errors.New("id is required")
-	ErrSourceRequired    = errors.New("order source is required")
-	ErrItemsRequired     = errors.New("at least one item is required")
-	ErrInvalidLineItem   = errors.New("invalid line item")
-	ErrTotalOverflow     = errors.New("order total overflow")
-	ErrInvalidStatus     = errors.New("invalid order status")
-	ErrInvalidTransition = errors.New("invalid order transition")
+	ErrTenantRequired     = errors.New("tenant id is required")
+	ErrIDRequired         = errors.New("id is required")
+	ErrSourceRequired     = errors.New("order source is required")
+	ErrItemsRequired      = errors.New("at least one item is required")
+	ErrInvalidLineItem    = errors.New("invalid line item")
+	ErrTotalOverflow      = errors.New("order total overflow")
+	ErrInvalidFulfillment = errors.New("invalid fulfillment type")
+	ErrInvalidStatus      = errors.New("invalid order status")
+	ErrInvalidTransition  = errors.New("invalid order transition")
 )
 
 type Status string
@@ -27,6 +29,34 @@ const (
 	StatusCancelled  Status = "CANCELLED"
 )
 
+type FulfillmentType string
+
+const (
+	FulfillmentDelivery FulfillmentType = "DELIVERY"
+	FulfillmentPickup   FulfillmentType = "PICKUP"
+	FulfillmentDineIn   FulfillmentType = "DINE_IN"
+)
+
+type CustomerSnapshot struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+	Email string `json:"email,omitempty"`
+}
+
+type AddressSnapshot struct {
+	ID           string `json:"id"`
+	Label        string `json:"label,omitempty"`
+	Street       string `json:"street"`
+	Number       string `json:"number"`
+	Complement   string `json:"complement,omitempty"`
+	Neighborhood string `json:"neighborhood"`
+	City         string `json:"city"`
+	State        string `json:"state"`
+	PostalCode   string `json:"postal_code"`
+	Reference    string `json:"reference,omitempty"`
+}
+
 type LineItemSnapshot struct {
 	ItemID         string `json:"item_id"`
 	Name           string `json:"name"`
@@ -35,12 +65,17 @@ type LineItemSnapshot struct {
 }
 
 type Order struct {
-	TenantID   string             `json:"tenant_id"`
-	ID         string             `json:"id"`
-	Source     string             `json:"source"`
-	Status     Status             `json:"status"`
-	Items      []LineItemSnapshot `json:"items"`
-	TotalCents int64              `json:"total_cents"`
+	TenantID    string             `json:"tenant_id"`
+	ID          string             `json:"id"`
+	Source      string             `json:"source"`
+	Status      Status             `json:"status"`
+	Items       []LineItemSnapshot `json:"items"`
+	TotalCents  int64              `json:"total_cents"`
+	Customer    *CustomerSnapshot  `json:"customer,omitempty"`
+	Address     *AddressSnapshot   `json:"address,omitempty"`
+	Fulfillment FulfillmentType    `json:"fulfillment_type"`
+	ScheduledAt *time.Time         `json:"scheduled_at,omitempty"`
+	Notes       string             `json:"notes,omitempty"`
 }
 
 func NewOrder(tenantID, id, source string, items []LineItemSnapshot) (*Order, error) {
@@ -75,14 +110,25 @@ func NewOrder(tenantID, id, source string, items []LineItemSnapshot) (*Order, er
 	}
 
 	return &Order{
-		TenantID:   tenantID,
-		ID:         id,
-		Source:     strings.TrimSpace(source),
-		Status:     StatusAnalysis,
-		Items:      cloned,
-		TotalCents: total,
+		TenantID:    tenantID,
+		ID:          id,
+		Source:      strings.TrimSpace(source),
+		Status:      StatusAnalysis,
+		Items:       cloned,
+		TotalCents:  total,
+		Fulfillment: FulfillmentPickup,
 	}, nil
 }
+func (o *Order) SetFulfillment(kind FulfillmentType) error {
+	switch kind {
+	case FulfillmentDelivery, FulfillmentPickup, FulfillmentDineIn:
+		o.Fulfillment = kind
+		return nil
+	default:
+		return ErrInvalidFulfillment
+	}
+}
+
 func (o *Order) Transition(next Status) error {
 	if !validStatus(next) {
 		return ErrInvalidStatus

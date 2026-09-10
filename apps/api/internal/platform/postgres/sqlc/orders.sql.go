@@ -12,17 +12,31 @@ import (
 )
 
 const createOrder = `-- name: CreateOrder :one
-INSERT INTO orders (id, tenant_id, source, status, total_cents)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, tenant_id, source, status, total_cents, created_at, updated_at
+INSERT INTO orders (
+    id, tenant_id, source, status, total_cents,
+    customer_id, customer_name_snapshot, customer_phone_snapshot,
+    customer_email_snapshot, address_id, address_snapshot,
+    fulfillment_type, scheduled_at, notes
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+RETURNING id, tenant_id, source, status, total_cents, created_at, updated_at, customer_id, customer_name_snapshot, customer_phone_snapshot, customer_email_snapshot, address_id, address_snapshot, fulfillment_type, scheduled_at, notes
 `
 
 type CreateOrderParams struct {
-	ID         pgtype.UUID `json:"id"`
-	TenantID   pgtype.UUID `json:"tenant_id"`
-	Source     string      `json:"source"`
-	Status     string      `json:"status"`
-	TotalCents int64       `json:"total_cents"`
+	ID                    pgtype.UUID        `json:"id"`
+	TenantID              pgtype.UUID        `json:"tenant_id"`
+	Source                string             `json:"source"`
+	Status                string             `json:"status"`
+	TotalCents            int64              `json:"total_cents"`
+	CustomerID            pgtype.UUID        `json:"customer_id"`
+	CustomerNameSnapshot  pgtype.Text        `json:"customer_name_snapshot"`
+	CustomerPhoneSnapshot pgtype.Text        `json:"customer_phone_snapshot"`
+	CustomerEmailSnapshot pgtype.Text        `json:"customer_email_snapshot"`
+	AddressID             pgtype.UUID        `json:"address_id"`
+	AddressSnapshot       []byte             `json:"address_snapshot"`
+	FulfillmentType       string             `json:"fulfillment_type"`
+	ScheduledAt           pgtype.Timestamptz `json:"scheduled_at"`
+	Notes                 string             `json:"notes"`
 }
 
 func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error) {
@@ -32,6 +46,15 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Order
 		arg.Source,
 		arg.Status,
 		arg.TotalCents,
+		arg.CustomerID,
+		arg.CustomerNameSnapshot,
+		arg.CustomerPhoneSnapshot,
+		arg.CustomerEmailSnapshot,
+		arg.AddressID,
+		arg.AddressSnapshot,
+		arg.FulfillmentType,
+		arg.ScheduledAt,
+		arg.Notes,
 	)
 	var i Order
 	err := row.Scan(
@@ -42,6 +65,15 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Order
 		&i.TotalCents,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CustomerID,
+		&i.CustomerNameSnapshot,
+		&i.CustomerPhoneSnapshot,
+		&i.CustomerEmailSnapshot,
+		&i.AddressID,
+		&i.AddressSnapshot,
+		&i.FulfillmentType,
+		&i.ScheduledAt,
+		&i.Notes,
 	)
 	return i, err
 }
@@ -136,7 +168,7 @@ func (q *Queries) DeleteOrderIdempotency(ctx context.Context, arg DeleteOrderIde
 }
 
 const getOrder = `-- name: GetOrder :one
-SELECT id, tenant_id, source, status, total_cents, created_at, updated_at
+SELECT id, tenant_id, source, status, total_cents, created_at, updated_at, customer_id, customer_name_snapshot, customer_phone_snapshot, customer_email_snapshot, address_id, address_snapshot, fulfillment_type, scheduled_at, notes
 FROM orders
 WHERE tenant_id = $1 AND id = $2
 `
@@ -157,6 +189,15 @@ func (q *Queries) GetOrder(ctx context.Context, arg GetOrderParams) (Order, erro
 		&i.TotalCents,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CustomerID,
+		&i.CustomerNameSnapshot,
+		&i.CustomerPhoneSnapshot,
+		&i.CustomerEmailSnapshot,
+		&i.AddressID,
+		&i.AddressSnapshot,
+		&i.FulfillmentType,
+		&i.ScheduledAt,
+		&i.Notes,
 	)
 	return i, err
 }
@@ -226,7 +267,7 @@ func (q *Queries) ListOrderItems(ctx context.Context, arg ListOrderItemsParams) 
 }
 
 const listOrders = `-- name: ListOrders :many
-SELECT id, tenant_id, source, status, total_cents, created_at, updated_at
+SELECT id, tenant_id, source, status, total_cents, created_at, updated_at, customer_id, customer_name_snapshot, customer_phone_snapshot, customer_email_snapshot, address_id, address_snapshot, fulfillment_type, scheduled_at, notes
 FROM orders
 WHERE tenant_id = $1
 ORDER BY created_at DESC, id
@@ -249,6 +290,15 @@ func (q *Queries) ListOrders(ctx context.Context, tenantID pgtype.UUID) ([]Order
 			&i.TotalCents,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CustomerID,
+			&i.CustomerNameSnapshot,
+			&i.CustomerPhoneSnapshot,
+			&i.CustomerEmailSnapshot,
+			&i.AddressID,
+			&i.AddressSnapshot,
+			&i.FulfillmentType,
+			&i.ScheduledAt,
+			&i.Notes,
 		); err != nil {
 			return nil, err
 		}
@@ -261,7 +311,7 @@ func (q *Queries) ListOrders(ctx context.Context, tenantID pgtype.UUID) ([]Order
 }
 
 const lockOrderForUpdate = `-- name: LockOrderForUpdate :one
-SELECT id, tenant_id, source, status, total_cents, created_at, updated_at
+SELECT id, tenant_id, source, status, total_cents, created_at, updated_at, customer_id, customer_name_snapshot, customer_phone_snapshot, customer_email_snapshot, address_id, address_snapshot, fulfillment_type, scheduled_at, notes
 FROM orders
 WHERE tenant_id = $1 AND id = $2
 FOR UPDATE
@@ -283,6 +333,15 @@ func (q *Queries) LockOrderForUpdate(ctx context.Context, arg LockOrderForUpdate
 		&i.TotalCents,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CustomerID,
+		&i.CustomerNameSnapshot,
+		&i.CustomerPhoneSnapshot,
+		&i.CustomerEmailSnapshot,
+		&i.AddressID,
+		&i.AddressSnapshot,
+		&i.FulfillmentType,
+		&i.ScheduledAt,
+		&i.Notes,
 	)
 	return i, err
 }
@@ -291,7 +350,7 @@ const updateOrderStatus = `-- name: UpdateOrderStatus :one
 UPDATE orders
 SET status = $3, updated_at = now()
 WHERE tenant_id = $1 AND id = $2
-RETURNING id, tenant_id, source, status, total_cents, created_at, updated_at
+RETURNING id, tenant_id, source, status, total_cents, created_at, updated_at, customer_id, customer_name_snapshot, customer_phone_snapshot, customer_email_snapshot, address_id, address_snapshot, fulfillment_type, scheduled_at, notes
 `
 
 type UpdateOrderStatusParams struct {
@@ -311,6 +370,15 @@ func (q *Queries) UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusPa
 		&i.TotalCents,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CustomerID,
+		&i.CustomerNameSnapshot,
+		&i.CustomerPhoneSnapshot,
+		&i.CustomerEmailSnapshot,
+		&i.AddressID,
+		&i.AddressSnapshot,
+		&i.FulfillmentType,
+		&i.ScheduledAt,
+		&i.Notes,
 	)
 	return i, err
 }

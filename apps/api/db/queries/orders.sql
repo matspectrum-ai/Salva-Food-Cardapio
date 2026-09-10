@@ -1,6 +1,11 @@
 -- name: CreateOrder :one
-INSERT INTO orders (id, tenant_id, source, status, total_cents)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO orders (
+    id, tenant_id, source, status, total_cents,
+    customer_id, customer_name_snapshot, customer_phone_snapshot,
+    customer_email_snapshot, address_id, address_snapshot,
+    fulfillment_type, scheduled_at, notes
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING *;
 
 -- name: CreateOrderItem :one

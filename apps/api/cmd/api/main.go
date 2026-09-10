@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/catalog"
+	"github.com/matspectrum-ai/salva-food/apps/api/internal/customers"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/identity"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/onboarding"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
@@ -29,6 +30,7 @@ func main() {
 	ctx := context.Background()
 	var catalogRepo catalog.Repository
 	var orderRepo orders.Repository
+	var customerRepo customers.Repository
 	var identityRepo identity.Repository
 	var authRepo identity.AuthRepository
 	var onboardingRepo onboarding.Repository
@@ -45,10 +47,12 @@ func main() {
 		authRepo = store
 		onboardingRepo = store
 		closeStore = store.Close
+		customerRepo = store
 		log.Printf("storage backend: postgres")
 	} else {
 		catalogRepo = catalog.NewMemoryStore()
 		orderRepo = orders.NewMemoryStore()
+		customerRepo = customers.NewMemoryStore()
 		identityStore := identity.NewMemoryStore()
 		identityRepo = identityStore
 		authRepo = identityStore
@@ -64,7 +68,7 @@ func main() {
 	authService := identity.NewAuthService(
 		authRepo, passwords, newOpaqueToken, uuid.NewString, time.Now, sessionTTL(),
 	)
-	api := httpapi.NewAuthenticatedWithOnboarding(catalogRepo, orderRepo, identityService, authService, onboardingService, uuid.NewString)
+	api := httpapi.NewAuthenticatedWithOnboarding(catalogRepo, orderRepo, identityService, authService, onboardingService, uuid.NewString, customerRepo)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.Handle("/", api.Handler())

@@ -21,6 +21,11 @@ Legend:
 | Orders | editar pedido existente via PDV | CONFIRMED_PUBLIC | TODO |
 | Orders | reimprimir comanda | CONFIRMED_PUBLIC | TODO |
 | Orders | cancelar/finalizar pedido | CONFIRMED_PUBLIC | TODO |
+| Customers | cadastro e listagem de clientes | CONFIRMED_AUTH | CORE_TESTED |
+| Customers | endereços por cliente | INFERRED | CORE_TESTED |
+| Orders | cliente/endereço associados ao pedido | INFERRED | CORE_TESTED |
+| Orders | snapshot histórico de cliente/endereço | INFERRED | CORE_TESTED |
+| Orders | delivery/pickup/salão + agendamento + observação | INFERRED | CORE_TESTED |
 | Catalog | cardápio digital | CONFIRMED_AUTH | TODO |
 | Catalog | categorias e produtos no gestor | CONFIRMED_AUTH | CORE_TESTED |
 | Catalog | complementos/combos | CONFIRMED_PUBLIC | TODO |

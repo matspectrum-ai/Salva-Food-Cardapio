@@ -50,3 +50,17 @@ Rota: `/main/order-schedule`
 - Transição exata `Pendente -> Aceito`.
 - Cancelamento, rejeição, edição e conflitos de horário.
 - Relação entre pedido agendado e o Kanban em tempo real.
+
+## ORD-003 — Contexto de cliente no pedido
+Status: `INFERRED`
+
+Implementação inicial do domínio mantém o pedido como snapshot histórico do cliente e endereço selecionados. O pedido pode carregar `customer_id`, `address_id`, dados copiados do cliente/endereço, modalidade `DELIVERY`/`PICKUP`/`DINE_IN`, `scheduled_at` e observação.
+
+Regras implementadas enquanto hipótese de domínio:
+- `customer_id` e `address_id` são resolvidos dentro do tenant ativo.
+- O endereço precisa pertencer ao cliente selecionado.
+- `DELIVERY` exige endereço.
+- Alterações futuras no cadastro não devem alterar o snapshot já gravado no pedido.
+- A chave de idempotência inclui todos os campos de entrada, portanto trocar cliente, endereço, modalidade, agendamento ou observação produz conflito em uma chave já utilizada.
+
+Essas regras são de implementação/inferência e não devem ser tratadas como comportamento confirmado do Anota AI até nova evidência autenticada.

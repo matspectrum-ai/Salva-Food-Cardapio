@@ -53,6 +53,33 @@ type CatalogItem struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Customer struct {
+	TenantID  pgtype.UUID        `json:"tenant_id"`
+	ID        pgtype.UUID        `json:"id"`
+	Name      string             `json:"name"`
+	Phone     string             `json:"phone"`
+	Email     pgtype.Text        `json:"email"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CustomerAddress struct {
+	TenantID     pgtype.UUID        `json:"tenant_id"`
+	ID           pgtype.UUID        `json:"id"`
+	CustomerID   pgtype.UUID        `json:"customer_id"`
+	Label        pgtype.Text        `json:"label"`
+	Street       string             `json:"street"`
+	Number       string             `json:"number"`
+	Complement   pgtype.Text        `json:"complement"`
+	Neighborhood string             `json:"neighborhood"`
+	City         string             `json:"city"`
+	State        string             `json:"state"`
+	PostalCode   string             `json:"postal_code"`
+	Reference    pgtype.Text        `json:"reference"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Establishment struct {
 	ID        pgtype.UUID        `json:"id"`
 	TenantID  pgtype.UUID        `json:"tenant_id"`
@@ -63,13 +90,22 @@ type Establishment struct {
 }
 
 type Order struct {
-	ID         pgtype.UUID        `json:"id"`
-	TenantID   pgtype.UUID        `json:"tenant_id"`
-	Source     string             `json:"source"`
-	Status     string             `json:"status"`
-	TotalCents int64              `json:"total_cents"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	ID                    pgtype.UUID        `json:"id"`
+	TenantID              pgtype.UUID        `json:"tenant_id"`
+	Source                string             `json:"source"`
+	Status                string             `json:"status"`
+	TotalCents            int64              `json:"total_cents"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	CustomerID            pgtype.UUID        `json:"customer_id"`
+	CustomerNameSnapshot  pgtype.Text        `json:"customer_name_snapshot"`
+	CustomerPhoneSnapshot pgtype.Text        `json:"customer_phone_snapshot"`
+	CustomerEmailSnapshot pgtype.Text        `json:"customer_email_snapshot"`
+	AddressID             pgtype.UUID        `json:"address_id"`
+	AddressSnapshot       []byte             `json:"address_snapshot"`
+	FulfillmentType       string             `json:"fulfillment_type"`
+	ScheduledAt           pgtype.Timestamptz `json:"scheduled_at"`
+	Notes                 string             `json:"notes"`
 }
 
 type OrderIdempotency struct {
