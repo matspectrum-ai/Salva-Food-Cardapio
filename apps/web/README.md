@@ -20,4 +20,4 @@ pnpm install
 pnpm dev
 ```
 
-The Go API is expected at `SALVA_API_URL`, defaulting to `http://127.0.0.1:8080`.
+The Go API is expected at `SALVA_API_URL`, defaulting to `http://127.0.0.1:18080`.

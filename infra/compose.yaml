@@ -1,0 +1,56 @@
+name: salva-food
+
+services:
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    container_name: salva-food-postgres
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      POSTGRES_DB: salva_food
+      POSTGRES_USER: salva_food
+      POSTGRES_PASSWORD: salva_food
+    command: ["postgres", "-p", "55432", "-c", "listen_addresses=127.0.0.1"]
+    volumes:
+      - salva_food_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 55432 -U salva_food -d salva_food"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: docker.io/library/redis:8-alpine
+    container_name: salva-food-redis
+    restart: unless-stopped
+    network_mode: host
+    command: ["redis-server", "--bind", "127.0.0.1", "--port", "56379", "--appendonly", "yes"]
+    volumes:
+      - salva_food_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-h", "127.0.0.1", "-p", "56379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: salva-food-minio
+    restart: unless-stopped
+    network_mode: host
+    command: ["server", "/data", "--address", "127.0.0.1:59000", "--console-address", "127.0.0.1:59001"]
+    environment:
+      MINIO_ROOT_USER: salva_food
+      MINIO_ROOT_PASSWORD: salva_food_local_dev
+    volumes:
+      - salva_food_minio:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:59000/minio/health/live >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  salva_food_postgres:
+  salva_food_redis:
+  salva_food_minio:

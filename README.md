@@ -18,3 +18,14 @@ Plataforma SaaS para restaurantes com objetivo de paridade funcional verificáve
 Fase 0 — Reverse-spec / mapa de paridade: **iniciada em 2026-09-06**.
 
 Veja `docs/PARITY_MATRIX.md`, `docs/ARCHITECTURE.md` e `docs/ROADMAP.md`.
+
+## Infraestrutura local
+
+A infraestrutura do Salva Food é self-hosted: PostgreSQL + Redis + MinIO, sem dependência de BaaS.
+
+    make infra-up
+    make db-migrate
+    make api-run
+
+Por padrão, os serviços locais usam PostgreSQL 127.0.0.1:55432, Redis 127.0.0.1:56379 e MinIO 127.0.0.1:59000.
+Veja docs/INFRASTRUCTURE.md para a topologia e infra/.env.example para as variáveis.

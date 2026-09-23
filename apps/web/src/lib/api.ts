@@ -3,7 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-export const API_URL = (process.env.SALVA_API_URL ?? "http://127.0.0.1:8080").replace(/\/$/, "");
+export const API_URL = (process.env.SALVA_API_URL ?? "http://127.0.0.1:18080").replace(/\/$/, "");
 export const SESSION_COOKIE = process.env.SALVA_SESSION_COOKIE ?? "salva_food_session";
 
 export type Permission = string;

@@ -75,7 +75,7 @@ func main() {
 
 	addr := os.Getenv("HTTP_ADDR")
 	if addr == "" {
-		addr = ":8080"
+		addr = ":18080"
 	}
 
 	log.Printf("salva-food-api listening on %s", addr)

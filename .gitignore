@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.example
+infra/.env
+.next/
+node_modules/
