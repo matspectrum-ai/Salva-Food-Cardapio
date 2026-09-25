@@ -95,6 +95,14 @@ func TestStoreIntegration(t *testing.T) {
 		t.Fatalf("unexpected created order: %+v", created)
 	}
 
+	var createdEvents int
+	if err := store.pool.QueryRow(ctx, `SELECT count(*) FROM outbox_events WHERE tenant_id = $1 AND aggregate_id = $2 AND event_type = $3`, testTenantA, testOrderA, "order.created").Scan(&createdEvents); err != nil {
+		t.Fatal(err)
+	}
+	if createdEvents != 1 {
+		t.Fatalf("order.created events = %d, want 1", createdEvents)
+	}
+
 	replayed, replay, err := store.Create(ctx, order, "checkout-001", fingerprintA)
 	if err != nil || !replay {
 		t.Fatalf("replay=%v err=%v", replay, err)
@@ -110,6 +118,14 @@ func TestStoreIntegration(t *testing.T) {
 	production, err := store.Transition(ctx, testTenantA, testOrderA, orders.StatusProduction)
 	if err != nil || production.Status != orders.StatusProduction {
 		t.Fatalf("transition: status=%v err=%v", production.Status, err)
+	}
+
+	var updatedEvents int
+	if err := store.pool.QueryRow(ctx, `SELECT count(*) FROM outbox_events WHERE tenant_id = $1 AND aggregate_id = $2 AND event_type = $3`, testTenantA, testOrderA, "order.updated").Scan(&updatedEvents); err != nil {
+		t.Fatal(err)
+	}
+	if updatedEvents != 1 {
+		t.Fatalf("order.updated events = %d, want 1", updatedEvents)
 	}
 
 	if _, ok, err := store.Get(ctx, testTenantB, testOrderA); err != nil || ok {

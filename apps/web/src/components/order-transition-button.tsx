@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { OrderStatus } from "@/lib/api";
 
@@ -17,7 +16,6 @@ const labels: Partial<Record<OrderStatus, string>> = {
 };
 
 export function OrderTransitionButton({ orderId, status }: { orderId: string; status: OrderStatus }) {
-  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const target = nextStatus[status];
@@ -26,19 +24,21 @@ export function OrderTransitionButton({ orderId, status }: { orderId: string; st
   async function transition() {
     setPending(true);
     setError("");
-    const response = await fetch(`/api/orders/${orderId}/transition`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: target }),
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      setError(payload?.error?.message ?? "Falha ao atualizar pedido.");
+    try {
+      const response = await fetch(`/api/orders/${orderId}/transition`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: target }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setError(payload?.error?.message ?? "Falha ao atualizar pedido.");
+      }
+    } catch {
+      setError("Falha de rede ao atualizar pedido.");
+    } finally {
       setPending(false);
-      return;
     }
-    router.refresh();
-    setPending(false);
   }
 
   return (

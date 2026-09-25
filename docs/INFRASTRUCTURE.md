@@ -55,3 +55,12 @@ provedor compatível sem acoplar o domínio.
 A mesma separação pode ser implantada em uma VPS dedicada ou em hosts separados:
 PostgreSQL gerenciado/self-hosted, Redis, S3-compatible e uma ou mais instâncias da API/web.
 Nenhum desses componentes exige um BaaS específico.
+
+## Fluxo de realtime de pedidos
+
+1. A API grava o pedido/mudança de estado e o evento na mesma transação PostgreSQL.
+2. O publisher do outbox lê eventos pendentes e publica no canal Redis do tenant.
+3. O endpoint SSE autentica o tenant e envia um snapshot inicial seguido dos eventos.
+4. O board web faz upsert por `order.id`, removendo automaticamente estados terminais da visão operacional.
+
+O outbox permanece no PostgreSQL; Redis Pub/Sub é apenas transporte efêmero.

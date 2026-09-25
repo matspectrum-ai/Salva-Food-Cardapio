@@ -64,3 +64,12 @@ Regras implementadas enquanto hipótese de domínio:
 - A chave de idempotência inclui todos os campos de entrada, portanto trocar cliente, endereço, modalidade, agendamento ou observação produz conflito em uma chave já utilizada.
 
 Essas regras são de implementação/inferência e não devem ser tratadas como comportamento confirmado do Anota AI até nova evidência autenticada.
+
+## Implementação Salva Food — realtime
+
+O Salva Food usa SSE para o quadro operacional. Esta decisão é arquitetural do projeto e não deve ser
+tratada como comportamento confirmado do Anota AI até captura black-box específica.
+
+Eventos internos atuais: `order.created` e `order.updated`.
+A fonte de verdade permanece PostgreSQL via transactional outbox; Redis Pub/Sub faz a distribuição;
+o navegador recebe snapshot inicial + eventos e atualiza o quadro sem reload completo.

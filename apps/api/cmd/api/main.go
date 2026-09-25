@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/catalog"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/customers"
@@ -19,6 +20,7 @@ import (
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/platform/httpapi"
 	postgresstore "github.com/matspectrum-ai/salva-food/apps/api/internal/platform/postgres"
+	"github.com/matspectrum-ai/salva-food/apps/api/internal/realtime"
 )
 
 type healthResponse struct {
@@ -35,6 +37,8 @@ func main() {
 	var authRepo identity.AuthRepository
 	var onboardingRepo onboarding.Repository
 	var closeStore func()
+	var eventBus realtime.Bus
+	var publishDirect bool
 
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
 		store, err := postgresstore.Open(ctx, databaseURL)
@@ -46,8 +50,25 @@ func main() {
 		identityRepo = store
 		authRepo = store
 		onboardingRepo = store
-		closeStore = store.Close
 		customerRepo = store
+		redisURL := os.Getenv("REDIS_URL")
+		if redisURL == "" {
+			log.Fatal("REDIS_URL is required when DATABASE_URL is configured")
+		}
+		redisOptions, err := redis.ParseURL(redisURL)
+		if err != nil {
+			log.Fatalf("parse REDIS_URL: %v", err)
+		}
+		redisClient := redis.NewClient(redisOptions)
+		if err := redisClient.Ping(ctx).Err(); err != nil {
+			_ = redisClient.Close()
+			store.Close()
+			log.Fatalf("ping redis: %v", err)
+		}
+		eventBus = realtime.NewRedisBus(redisClient, "salva-food")
+		publisher := postgresstore.NewOutboxPublisher(store, eventBus)
+		go publisher.Run(ctx)
+		closeStore = func() { _ = redisClient.Close(); store.Close() }
 		log.Printf("storage backend: postgres")
 	} else {
 		catalogRepo = catalog.NewMemoryStore()
@@ -58,6 +79,8 @@ func main() {
 		authRepo = identityStore
 		onboardingRepo = onboarding.NewMemoryRepository(identityStore)
 		closeStore = func() {}
+		eventBus = realtime.NewMemoryBus()
+		publishDirect = true
 		log.Printf("storage backend: memory")
 	}
 	defer closeStore()
@@ -68,7 +91,7 @@ func main() {
 	authService := identity.NewAuthService(
 		authRepo, passwords, newOpaqueToken, uuid.NewString, time.Now, sessionTTL(),
 	)
-	api := httpapi.NewAuthenticatedWithOnboarding(catalogRepo, orderRepo, identityService, authService, onboardingService, uuid.NewString, customerRepo)
+	api := httpapi.NewAuthenticatedWithOnboardingAndRealtime(catalogRepo, orderRepo, identityService, authService, onboardingService, uuid.NewString, customerRepo, eventBus, publishDirect)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.Handle("/", api.Handler())

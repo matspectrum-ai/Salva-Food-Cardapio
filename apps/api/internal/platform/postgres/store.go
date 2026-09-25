@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -345,6 +346,10 @@ func (s *Store) Create(ctx context.Context, order *orders.Order, key, fingerprin
 		}
 	}
 
+	if err := insertOrderOutbox(ctx, q, tenantID, order, "order.created"); err != nil {
+		return nil, false, err
+	}
+
 	_, err = q.CreateOrderIdempotency(ctx, db.CreateOrderIdempotencyParams{
 		TenantID: tenantID, IdempotencyKey: key,
 		RequestFingerprint: fingerprint, OrderID: orderID,
@@ -451,10 +456,29 @@ func (s *Store) Transition(ctx context.Context, tenantIDValue, idValue string, n
 	if err != nil {
 		return nil, err
 	}
+	if err := insertOrderOutbox(ctx, q, tenantID, order, "order.updated"); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 	return order, nil
+}
+
+func insertOrderOutbox(ctx context.Context, q *db.Queries, tenantID pgtype.UUID, order *orders.Order, eventType string) error {
+	payload, err := json.Marshal(order)
+	if err != nil {
+		return err
+	}
+	orderID, err := parseUUID(order.ID)
+	if err != nil {
+		return err
+	}
+	_, err = q.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
+		ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, TenantID: tenantID, AggregateType: "order", AggregateID: orderID,
+		EventType: eventType, Payload: payload,
+	})
+	return err
 }
 
 func (s *Store) loadOrder(ctx context.Context, q *db.Queries, tenantID, id pgtype.UUID) (*orders.Order, error) {

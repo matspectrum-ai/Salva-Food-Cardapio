@@ -4,14 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/catalog"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/customers"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/identity"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/onboarding"
 	"github.com/matspectrum-ai/salva-food/apps/api/internal/orders"
+	"github.com/matspectrum-ai/salva-food/apps/api/internal/realtime"
 )
 
 type IDGenerator func() string
@@ -26,6 +29,8 @@ type API struct {
 	strictAuth        bool
 	newID             IDGenerator
 	customers         customers.Repository
+	eventBus          realtime.Bus
+	publishDirect     bool
 }
 
 type catalogReader struct {
@@ -68,17 +73,25 @@ func NewAuthenticatedWithOnboarding(catalogStore catalog.Repository, orderStore 
 	return newAPI(catalogStore, orderStore, identityService, authService, onboardingService, true, newID, customerRepos...)
 }
 
+func NewAuthenticatedWithOnboardingAndRealtime(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, onboardingService *onboarding.Service, newID IDGenerator, customerRepo customers.Repository, eventBus realtime.Bus, publishDirect bool) *API {
+	return newAPIWithRealtime(catalogStore, orderStore, identityService, authService, onboardingService, true, newID, customerRepo, eventBus, publishDirect)
+}
+
 func newAPI(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, onboardingService *onboarding.Service, strictAuth bool, newID IDGenerator, customerRepos ...customers.Repository) *API {
 	var customerRepo customers.Repository
 	if len(customerRepos) > 0 {
 		customerRepo = customerRepos[0]
 	}
+	return newAPIWithRealtime(catalogStore, orderStore, identityService, authService, onboardingService, strictAuth, newID, customerRepo, nil, false)
+}
+
+func newAPIWithRealtime(catalogStore catalog.Repository, orderStore orders.Repository, identityService *identity.Service, authService *identity.AuthService, onboardingService *onboarding.Service, strictAuth bool, newID IDGenerator, customerRepo customers.Repository, eventBus realtime.Bus, publishDirect bool) *API {
 	var customerReader orders.CustomerReader
 	if customerRepo != nil {
 		customerReader = customerRepo
 	}
 	return &API{
-		catalog: catalogStore, orders: orderStore, customers: customerRepo,
+		catalog: catalogStore, orders: orderStore, customers: customerRepo, eventBus: eventBus, publishDirect: publishDirect,
 		orderService:    orders.NewService(orderStore, catalogReader{store: catalogStore}, orders.IDGenerator(newID), customerReader),
 		identityService: identityService, authService: authService, onboardingService: onboardingService, strictAuth: strictAuth, newID: newID,
 	}
@@ -92,6 +105,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/orders", a.createOrder)
 	mux.HandleFunc("GET /api/v1/orders", a.listOrders)
 	mux.HandleFunc("POST /api/v1/orders/{id}/transitions", a.transitionOrder)
+	mux.HandleFunc("GET /api/v1/orders/events", a.orderEvents)
 	if a.customers != nil {
 		mux.HandleFunc("POST /api/v1/customers", a.createCustomer)
 		mux.HandleFunc("GET /api/v1/customers", a.listCustomers)
@@ -221,6 +235,9 @@ func (a *API) createOrder(w http.ResponseWriter, r *http.Request) {
 	if replay {
 		w.Header().Set("Idempotent-Replay", "true")
 	}
+	if !replay && a.publishDirect && a.eventBus != nil {
+		_ = a.publishOrderEvent(r.Context(), order, realtime.EventOrderCreated)
+	}
 	writeJSON(w, http.StatusCreated, order)
 }
 
@@ -259,7 +276,75 @@ func (a *API) transitionOrder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, err)
 		return
 	}
+	if a.publishDirect && a.eventBus != nil {
+		_ = a.publishOrderEvent(r.Context(), order, realtime.EventOrderUpdated)
+	}
 	writeJSON(w, http.StatusOK, order)
+}
+
+func (a *API) publishOrderEvent(ctx context.Context, order *orders.Order, eventType string) error {
+	payload, err := json.Marshal(order)
+	if err != nil {
+		return err
+	}
+	return a.eventBus.Publish(ctx, realtime.Event{
+		ID: order.ID + ":" + string(order.Status), TenantID: order.TenantID, AggregateType: "order", AggregateID: order.ID,
+		Type: eventType, Payload: payload, OccurredAt: time.Now().UTC(),
+	})
+}
+
+func (a *API) orderEvents(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := a.tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	if a.eventBus == nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New("realtime is not configured"))
+		return
+	}
+	ch, err := a.eventBus.Subscribe(r.Context(), tenantID)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, err)
+		return
+	}
+	current, err := a.orders.List(r.Context(), tenantID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, errors.New("streaming is not supported"))
+		return
+	}
+	writeSSE(w, flusher, "orders.snapshot", current)
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-heartbeat.C:
+			fmt.Fprint(w, ": keep-alive\n\n")
+			flusher.Flush()
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+			fmt.Fprintf(w, "id: %s\nevent: %s\ndata: %s\n\n", event.ID, event.Type, event.Payload)
+			flusher.Flush()
+		}
+	}
+}
+
+func writeSSE(w http.ResponseWriter, flusher http.Flusher, eventType string, payload any) {
+	b, _ := json.Marshal(payload)
+	fmt.Fprintf(w, "event: %s\ndata: %s\n\n", eventType, b)
+	flusher.Flush()
 }
 
 type createCustomerRequest struct {

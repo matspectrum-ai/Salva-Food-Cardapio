@@ -26,6 +26,11 @@ export type Order = {
   tenant_id: string; id: string; source: string; status: OrderStatus;
   items: Array<{ item_id: string; name: string; quantity: number; unit_price_cents: number }>;
   total_cents: number;
+  customer?: { id: string; name: string; phone: string; email?: string };
+  address?: { id: string; label?: string; street: string; number: string; complement?: string; neighborhood: string; city: string; state: string; postal_code: string; reference?: string };
+  fulfillment_type: "DELIVERY" | "PICKUP" | "DINE_IN";
+  scheduled_at?: string;
+  notes?: string;
 };
 
 async function sessionToken() {

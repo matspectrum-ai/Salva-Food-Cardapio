@@ -14,7 +14,7 @@ Legend:
 | Onboarding | cadastro inicial do estabelecimento | CONFIRMED_PUBLIC | CORE_TESTED |
 | Onboarding | importar configuração/cardápio do iFood | CONFIRMED_AUTH | TODO |
 | Onboarding | configuração manual | CONFIRMED_PUBLIC | TODO |
-| Orders | Kanban de pedidos | CONFIRMED_AUTH | TODO |
+| Orders | Kanban de pedidos | CONFIRMED_AUTH | CORE_TESTED |
 | Orders | análise -> produção -> pronto/entrega -> finalizado | CONFIRMED_PUBLIC | CORE_TESTED |
 | Orders | busca/filtros por canal/tipo | CONFIRMED_AUTH | TODO |
 | Orders | pedidos agendados: filtros + abas Pendentes/Aceitos | CONFIRMED_AUTH | TODO |

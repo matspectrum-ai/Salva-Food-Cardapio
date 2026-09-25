@@ -24,3 +24,19 @@ export async function proxyToAPI(path: string, init: RequestInit) {
 
   return new NextResponse(body || null, { status: upstream.status, headers: responseHeaders });
 }
+
+
+export async function streamToAPI(path: string) {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) {
+    return NextResponse.json({ error: { message: "unauthorized" } }, { status: 401 });
+  }
+  const headers = new Headers({ Authorization: `Bearer ${token}` });
+  const upstream = await fetch(`${API_URL}${path}`, { headers, cache: "no-store" });
+  const responseHeaders = new Headers();
+  for (const name of ["content-type", "cache-control", "connection", "x-accel-buffering"]) {
+    const value = upstream.headers.get(name);
+    if (value) responseHeaders.set(name, value);
+  }
+  return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
+}
